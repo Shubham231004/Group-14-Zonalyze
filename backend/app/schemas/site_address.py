@@ -28,6 +28,17 @@ class SiteCoordinate(BaseModel):
     longitude: float
 
 
+class SiteGeocodeCandidate(BaseModel):
+    display_name: str
+    latitude: float
+    longitude: float
+    resolved_municipality: Optional[str] = None
+    municipality_match: bool = False
+    confidence: str = "limited"
+    importance: Optional[float] = None
+    source: str = "OpenStreetMap Nominatim"
+
+
 class SiteEvidenceItem(BaseModel):
     name: str
     category: str
@@ -42,17 +53,25 @@ class SiteEvidenceSummary(BaseModel):
     count: int
     nearest: Optional[SiteEvidenceItem] = None
     items: List[SiteEvidenceItem] = Field(default_factory=list)
+    status: str = Field(
+        default="unknown",
+        description="available, no_results, query_failed, skipped, or unknown",
+    )
+    note: Optional[str] = None
 
 
 class SiteAddressAnalysisResponse(BaseModel):
     status: str
     input_address: str
     resolved_address: Optional[str] = None
+    resolved_municipality: Optional[str] = None
     municipality_name: str
+    municipality_match: bool = False
     radius_km: float
     coordinate: Optional[SiteCoordinate] = None
     geocode_source: str
     geocode_confidence: str
+    geocode_candidates: List[SiteGeocodeCandidate] = Field(default_factory=list)
     competitor_evidence: SiteEvidenceSummary
     transit_evidence: SiteEvidenceSummary
     commercial_activity_evidence: SiteEvidenceSummary

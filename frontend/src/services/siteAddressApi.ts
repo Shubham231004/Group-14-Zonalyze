@@ -8,6 +8,17 @@ export type SiteAddressAnalysisRequest = {
   business_query?: string | null;
 };
 
+export type SiteGeocodeCandidate = {
+  display_name: string;
+  latitude: number;
+  longitude: number;
+  resolved_municipality?: string | null;
+  municipality_match: boolean;
+  confidence: string;
+  importance?: number | null;
+  source: string;
+};
+
 export type SiteEvidenceItem = {
   name: string;
   category: string;
@@ -22,17 +33,22 @@ export type SiteEvidenceSummary = {
   count: number;
   nearest?: SiteEvidenceItem | null;
   items: SiteEvidenceItem[];
+  status?: string;
+  note?: string | null;
 };
 
 export type SiteAddressAnalysisResponse = {
   status: string;
   input_address: string;
   resolved_address?: string | null;
+  resolved_municipality?: string | null;
   municipality_name: string;
+  municipality_match?: boolean;
   radius_km: number;
   coordinate?: { latitude: number; longitude: number } | null;
   geocode_source: string;
   geocode_confidence: string;
+  geocode_candidates?: SiteGeocodeCandidate[];
   competitor_evidence: SiteEvidenceSummary;
   transit_evidence: SiteEvidenceSummary;
   commercial_activity_evidence: SiteEvidenceSummary;
