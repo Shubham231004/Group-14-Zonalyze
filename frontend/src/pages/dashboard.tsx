@@ -24,6 +24,10 @@ import {
   Target,
   TrendingUp,
   Users,
+  MessageSquare,
+  X,
+  ChevronRight,
+  HelpCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -38,6 +42,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,7 +69,6 @@ import OperatingProfilePanel from "@/components/OperatingProfilePanel";
 import LocationComparisonPanel from "@/components/LocationComparisonPanel";
 import SiteAddressAnalysisPanel from "@/components/SiteAddressAnalysisPanel";
 
-
 import {
   analyzeScenario,
   clearScenarioHistory,
@@ -87,8 +91,6 @@ import {
   type ScenarioHistoryItem,
   type SystemValidationResponse,
 } from "@/services/api";
-
-
 
 const DEFAULT_MUNICIPALITY = "Kitchener";
 const DEFAULT_BUSINESS = "Indian Grocery Store";
@@ -123,18 +125,18 @@ function indicatorTextClass(indicator: string) {
 }
 
 function indicatorBadgeClass(indicator: string) {
-  if (indicator === "green") return "text-emerald-400 border-emerald-400/30";
-  if (indicator === "yellow") return "text-accent border-accent/30";
-  if (indicator === "red") return "text-destructive border-destructive/30";
+  if (indicator === "green") return "text-emerald-400 border-emerald-400/30 bg-emerald-500/5";
+  if (indicator === "yellow") return "text-accent border-accent/30 bg-accent/5";
+  if (indicator === "red") return "text-destructive border-destructive/30 bg-destructive/5";
   return "text-white border-white/20";
 }
 
 function recommendationBadgeClass(recommendation?: string) {
   if (recommendation === "recommended")
-    return "text-emerald-400 border-emerald-400/30";
-  if (recommendation === "borderline") return "text-accent border-accent/30";
+    return "text-emerald-400 border-emerald-400/30 bg-emerald-500/5";
+  if (recommendation === "borderline") return "text-accent border-accent/30 bg-accent/5";
   if (recommendation === "not_recommended")
-    return "text-destructive border-destructive/30";
+    return "text-destructive border-destructive/30 bg-destructive/5";
   return "text-white border-white/20";
 }
 
@@ -144,6 +146,7 @@ function getMetric(data: DashboardSummaryResponse | null, key: string) {
   );
 }
 
+// Generates synthetic population data for charts
 function buildDemographicChartData(data: DashboardSummaryResponse | null) {
   return [
     { group: "Youth", value: getMetric(data, "students_pct") },
@@ -196,10 +199,10 @@ function formatPercent(value?: number | null) {
 }
 
 function credibilityClass(level?: string) {
-  if (level === "strong") return "text-emerald-400 border-emerald-400/30";
-  if (level === "moderate") return "text-primary border-primary/30";
-  if (level === "limited") return "text-accent border-accent/30";
-  return "text-destructive border-destructive/30";
+  if (level === "strong") return "text-emerald-400 border-emerald-400/30 bg-emerald-500/5";
+  if (level === "moderate") return "text-primary border-primary/30 bg-primary/5";
+  if (level === "limited") return "text-accent border-accent/30 bg-accent/5";
+  return "text-destructive border-destructive/30 bg-destructive/5";
 }
 
 function readableRecommendation(value?: string) {
@@ -211,8 +214,9 @@ function MarketMapPanel({ geoContext }: { geoContext: GeospatialMarketContext | 
   if (!geoContext) {
     return (
       <Card className="scada-panel border-white/5">
-        <CardContent className="p-5">
-          <p className="text-xs lcd-text text-muted-foreground">
+        <CardContent className="p-8 flex flex-col items-center justify-center min-h-[400px]">
+          <Signal className="w-8 h-8 text-primary animate-pulse mb-3" />
+          <p className="text-xs font-mono lcd-text text-muted-foreground">
             Geospatial market context is loading...
           </p>
         </CardContent>
@@ -223,7 +227,7 @@ function MarketMapPanel({ geoContext }: { geoContext: GeospatialMarketContext | 
   return (
     <MarketMap
       geoContext={geoContext}
-      className="scada-panel border-white/5"
+      className="scada-panel border-white/5 shadow-2xl rounded-2xl overflow-hidden min-h-[500px]"
     />
   );
 }
@@ -267,6 +271,16 @@ export default function Dashboard() {
   const [isSavingScenario, setIsSavingScenario] = useState(false);
   const [isComparingScenarios, setIsComparingScenarios] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  // Redesign & loader state managers
+  const [isScenarioSelected, setIsScenarioSelected] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "map" | "evidence" | "benchmarks" | "history">("overview");
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Simulated Loader Progress States
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStep, setLoadingStep] = useState("");
 
   const debounceRef = useRef<number | null>(null);
   const initialLoadDoneRef = useRef(false);
@@ -444,6 +458,38 @@ export default function Dashboard() {
     toast,
   ]);
 
+  // Simulated Loading Sequence
+  const handleStartAnalysis = () => {
+    setIsAnalyzing(true);
+    setLoadingProgress(0);
+    setLoadingStep("Loading Statistics Canada Census demographic datasets...");
+
+    const interval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        const next = prev + 1;
+        if (next >= 100) {
+          clearInterval(interval);
+          setIsAnalyzing(false);
+          setIsScenarioSelected(true);
+          return 100;
+        }
+
+        if (next === 20) {
+          setLoadingStep("Connecting to PostgreSQL; retrieving catchment populations...");
+        } else if (next === 40) {
+          setLoadingStep("Running Random Forest ML estimators for feasibility & net revenue...");
+        } else if (next === 65) {
+          setLoadingStep("Resolving live competitor nodes from OpenStreetMap Overpass API...");
+        } else if (next === 80) {
+          setLoadingStep("Calculating local lease costs & demand proxies...");
+        } else if (next === 93) {
+          setLoadingStep("Compiling decision-support recommendation index...");
+        }
+        return next;
+      });
+    }, 60); // Total 6000ms (6 seconds)
+  };
+
   const handleExport = async () => {
     try {
       setIsExporting(true);
@@ -516,7 +562,6 @@ export default function Dashboard() {
       setIsValidating(false);
     }
   };
-
 
   const handleSaveScenario = async () => {
     try {
@@ -599,139 +644,317 @@ export default function Dashboard() {
 
   if (isInitialLoading || !dashboardData) {
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <div className="scada-panel px-6 py-4 rounded-lg">
-          <p className="lcd-text text-sm text-white/80">
-            Loading Zonalyze ML core...
-          </p>
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center relative overflow-hidden">
+        <div className="scanline" />
+        <div className="scada-panel px-8 py-6 rounded-2xl flex flex-col items-center gap-4 max-w-sm text-center">
+          <BrainCircuit className="w-12 h-12 text-primary animate-pulse" />
+          <div>
+            <h3 className="font-display font-bold text-white text-lg tracking-wider">ZONALYZE CORE</h3>
+            <p className="lcd-text text-[11px] text-primary mt-1">Initializing ML Prediction Models...</p>
+          </div>
         </div>
       </div>
     );
   }
 
+  // --- RENDERING PROGRESS LOADER SCREEN ---
+  if (isAnalyzing) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center font-sans p-6 relative overflow-hidden">
+        <div className="scanline" />
+        <div className="absolute top-10 left-10 w-72 h-72 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+
+        <Card className="scada-panel border-white/10 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-6">
+          <img src="/logo.jpg" className="w-48 mx-auto rounded-2xl border border-white/15 shadow-xl shadow-primary/5" alt="Logo" />
+          
+          <div className="space-y-2">
+            <h3 className="text-lg font-display text-white tracking-wider uppercase">Analyzing Feasibility</h3>
+            <p className="text-xs text-slate-400">Running advanced geospatial and ML algorithms</p>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden border border-white/5 p-0.5">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-cyan-400 rounded-full transition-all duration-100 ease-out"
+                style={{ width: `${loadingProgress}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs font-mono text-slate-400">
+              <span className="lcd-text text-primary">Progress</span>
+              <span>{loadingProgress}%</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-950/70 rounded-xl border border-white/5 p-4 min-h-[72px] flex items-center justify-center">
+            <p className="text-[11px] font-mono text-slate-300 leading-relaxed text-center">
+              {loadingStep}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <Cpu className="w-4 h-4 text-cyan-400 animate-spin" />
+            <span className="text-[9px] font-mono lcd-text text-slate-500 uppercase tracking-widest">
+              Zonalyze Engine Processing
+            </span>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // --- RENDERING LANDING SCREEN (Scenario Selection) ---
+  if (!isScenarioSelected) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex flex-col font-sans p-4 md:p-8 relative overflow-hidden">
+        <div className="scanline" />
+        
+        {/* Floating background blobs */}
+        <div className="absolute top-10 left-10 w-72 h-72 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+
+        <header className="flex items-center justify-between pb-6 mb-8 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <img src="/logo.jpg" className="w-10 h-10 object-contain rounded-md border border-white/10" alt="Logo" />
+            <div>
+              <h1 className="text-xl font-display font-bold tracking-wider text-white">ZONALYZE</h1>
+              <p className="text-[10px] lcd-text text-muted-foreground">Feasibility intelligence Engine</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="border-white/10 text-white/50 text-[10px] font-mono">
+              v{dashboardData.project_phase ? "1.0.0" : "0.1.0"}
+            </Badge>
+          </div>
+        </header>
+
+        <main className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-12 max-w-6xl mx-auto w-full z-10 py-6">
+          <div className="flex-1 max-w-lg space-y-6 text-center lg:text-left">
+            <Badge className="bg-primary/20 text-primary hover:bg-primary/30 border border-primary/40 uppercase tracking-widest text-[10px] font-mono py-1 px-3">
+              Decision Support System
+            </Badge>
+            <h2 className="text-4xl md:text-5xl font-display font-black text-white leading-tight tracking-tight">
+              Evaluate Location <br />
+              <span className="bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
+                Feasibility Instantly
+              </span>
+            </h2>
+            <p className="text-slate-400 text-sm md:text-base leading-relaxed">
+              Analyze commercial spaces, competitor densities, daytime activities, and localized demographic mixes. Make data-driven decisions powered by machine learning algorithms.
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4 text-left pt-2">
+              <div className="border border-white/5 bg-white/[0.02] p-4 rounded-xl">
+                <Users className="w-5 h-5 text-primary mb-2" />
+                <h4 className="text-xs font-display text-white tracking-wide uppercase">Demographics</h4>
+                <p className="text-[11px] text-slate-500 mt-1 leading-snug">Statistics Canada 2021 census mapping subdivisions.</p>
+              </div>
+              <div className="border border-white/5 bg-white/[0.02] p-4 rounded-xl">
+                <MapPin className="w-5 h-5 text-accent mb-2" />
+                <h4 className="text-xs font-display text-white tracking-wide uppercase">Competitors</h4>
+                <p className="text-[11px] text-slate-500 mt-1 leading-snug">Live geographic mapping via OpenStreetMap Overpass.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full max-w-md">
+            <Card className="scada-panel border-white/10 rounded-2xl shadow-2xl p-6 space-y-6">
+              <div className="border-b border-white/5 pb-4">
+                <img src="/logo.jpg" className="w-32 mx-auto rounded-xl border border-white/10 shadow-md mb-4" alt="Logo" />
+                <h3 className="text-base font-display text-white text-center tracking-wider uppercase">
+                  Setup Scenario
+                </h3>
+              </div>
+
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" /> Target Municipality
+                  </label>
+                  <Select value={municipalityName} onValueChange={setMunicipalityName}>
+                    <SelectTrigger className="bg-background/50 border-white/10 font-mono text-sm h-11 rounded-xl focus:ring-primary">
+                      <SelectValue placeholder="Select municipality" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-white/10 max-h-[300px]">
+                      {municipalityOptions.map((city) => (
+                        <SelectItem
+                          key={`${city.municipality_name}-${city.municipality_type}`}
+                          value={city.municipality_name}
+                          className="font-mono text-sm"
+                        >
+                          {city.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
+                    <Store className="w-3.5 h-3.5" /> Business Subcategory
+                  </label>
+                  <Select value={businessSubcategory} onValueChange={setBusinessSubcategory}>
+                    <SelectTrigger className="bg-background/50 border-white/10 font-mono text-sm h-11 rounded-xl focus:ring-primary">
+                      <SelectValue placeholder="Select business" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-white/10 max-h-[300px]">
+                      {businessOptions.map((business) => (
+                        <SelectItem
+                          key={`${business.business_category}-${business.business_subcategory}`}
+                          value={business.business_subcategory}
+                          className="font-mono text-sm"
+                        >
+                          {business.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
+                      <Target className="w-3.5 h-3.5" /> Catchment Radius
+                    </label>
+                    <span className="text-primary font-mono text-sm font-bold">
+                      {radius[0]} km
+                    </span>
+                  </div>
+                  <Slider
+                    value={radius}
+                    onValueChange={setRadius}
+                    max={25}
+                    min={1}
+                    step={1}
+                    className="py-2 [&_[role=slider]]:bg-primary [&_[role=slider]]:border-primary"
+                  />
+                </div>
+
+                <Button
+                  className="w-full bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/95 hover:to-cyan-500/95 text-white font-mono uppercase tracking-widest text-sm py-6 rounded-xl shadow-lg shadow-primary/20 transition-all duration-300 font-bold mt-4"
+                  onClick={handleStartAnalysis}
+                  disabled={isUpdating}
+                >
+                  <ChevronRight className="w-5 h-5 mr-2" />
+                  Analyze Location Feasibility
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </main>
+
+        <footer className="py-6 border-t border-white/5 text-center text-[10px] lcd-text text-slate-600">
+          ZONALYZE FEASIBILITY PLATFORM • CAPSTONE PROTOTYPE
+        </footer>
+      </div>
+    );
+  }
+
+  // --- RENDERING WORKSPACE SCREEN (Redesigned Tabbed Layout) ---
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans p-4 lg:p-6 overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans p-4 lg:p-6 overflow-x-hidden relative">
+      <div className="scanline" />
+
+      {/* Styled Top Syncing Progress Bar */}
+      <style>{`
+        @keyframes gradientSlide {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+      `}</style>
+      <AnimatePresence>
+        {isUpdating && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary via-cyan-400 to-primary z-50 shadow-md shadow-primary/30"
+            style={{
+              backgroundSize: "200% 100%",
+              animation: "gradientSlide 1.5s linear infinite"
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Header Panel */}
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 pb-4 border-b border-white/10 gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/20 rounded-md flex items-center justify-center border border-primary/50 relative overflow-hidden">
-            <Activity className="text-primary w-6 h-6 z-10" />
-            <div className="absolute inset-0 bg-primary/20 animate-pulse" />
-          </div>
+          <img src="/logo.jpg" className="w-12 h-12 rounded-md object-contain border border-white/10" alt="Logo" />
           <div>
-            <h1 className="text-2xl md:text-3xl font-display font-bold tracking-wider text-white">
+            <h1 className="text-2xl font-display font-bold tracking-wider text-white">
               ZONALYZE{" "}
-              <span className="text-primary text-sm tracking-widest uppercase">
+              <span className="text-primary text-xs tracking-widest uppercase">
                 ML.Core
               </span>
             </h1>
-            <p className="text-muted-foreground text-xs lcd-text">
-              {dashboardData.project_phase}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="border-primary/20 text-primary-foreground text-[9px] uppercase font-mono py-0.5 px-2 bg-primary/5">
+                {municipalityName} • {businessSubcategory} • {radius[0]} km
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 text-[9px] font-mono text-muted-foreground hover:text-white uppercase px-1 underline"
+                onClick={() => setIsScenarioSelected(false)}
+              >
+                Change Scenario
+              </Button>
+            </div>
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 md:gap-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-          <Link
-            href="/"
-            className="text-[10px] lcd-text px-3 py-1.5 rounded border transition-all uppercase tracking-widest inline-block bg-primary/20 border-primary/50 text-primary"
-          >
-            Core
-          </Link>
-        </nav>
-
-        <div className="flex items-center gap-4">
+        {/* Sync/Status Indicators */}
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-md border border-white/5 backdrop-blur-md">
             <Signal
-              className={`w-4 h-4 ${isUpdating ? "text-accent animate-pulse" : "text-emerald-400"}`}
+              className={`w-3.5 h-3.5 ${isUpdating ? "text-accent animate-pulse" : "text-emerald-400"}`}
             />
-            <span className="text-xs lcd-text text-white/80">
-              LIVE SYNC:{" "}
-              {isUpdating ? "CALCULATING..." : lastUpdate.toLocaleTimeString()}
+            <span className="text-[10px] lcd-text text-white/80">
+              {isUpdating ? "ENGINE SYNCING..." : `SYNCED: ${lastUpdate.toLocaleTimeString()}`}
             </span>
           </div>
           <Button
             variant="outline"
-            className="bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary-foreground font-mono text-sm uppercase tracking-wider"
+            className="bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary-foreground font-mono text-xs uppercase tracking-wider"
             onClick={handleExport}
             disabled={isExporting}
           >
             <Download
-              className={`w-4 h-4 mr-2 ${isExporting ? "animate-pulse" : ""}`}
+              className={`w-3.5 h-3.5 mr-2 ${isExporting ? "animate-pulse" : ""}`}
             />
-            {isExporting ? "Generating..." : "Export Report"}
+            {isExporting ? "Exporting..." : "Export Report"}
           </Button>
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Main Workspace Area */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Sidebar (Control Center) */}
         <div className="lg:col-span-3 flex flex-col gap-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Settings className="w-5 h-5 text-muted-foreground" />
-            <h2 className="text-lg font-display text-white/90">
-              Control Dials
-            </h2>
-          </div>
-
+          
+          {/* Quick Dials */}
           <Card className="scada-panel border-white/5">
-            <CardContent className="p-5 space-y-6">
-              <div className="space-y-3">
-                <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> Municipality
-                </label>
-                <Select
-                  value={municipalityName}
-                  onValueChange={setMunicipalityName}
-                >
-                  <SelectTrigger className="bg-background/50 border-white/10 font-mono text-sm h-9">
-                    <SelectValue placeholder="Select municipality" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-white/10 max-h-[320px]">
-                    {municipalityOptions.map((city) => (
-                      <SelectItem
-                        key={`${city.municipality_name}-${city.municipality_type}`}
-                        value={city.municipality_name}
-                        className="font-mono text-sm"
-                      >
-                        {city.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <CardHeader className="pb-3 border-b border-white/5">
+              <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90 flex justify-between items-center">
+                <span>Active Target</span>
+                <Badge variant="outline" className="border-white/10 text-[9px] font-mono">{radius[0]} km</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div>
+                <p className="text-[10px] lcd-text text-muted-foreground">Location</p>
+                <p className="font-mono text-sm text-white mt-0.5">{municipalityName}</p>
               </div>
-
-              <div className="space-y-3">
-                <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1">
-                  <Store className="w-3 h-3" /> Business Subcategory
-                </label>
-                <Select
-                  value={businessSubcategory}
-                  onValueChange={setBusinessSubcategory}
-                >
-                  <SelectTrigger className="bg-background/50 border-white/10 font-mono text-sm h-9">
-                    <SelectValue placeholder="Select business" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-white/10 max-h-[320px]">
-                    {businessOptions.map((business) => (
-                      <SelectItem
-                        key={`${business.business_category}-${business.business_subcategory}`}
-                        value={business.business_subcategory}
-                        className="font-mono text-sm"
-                      >
-                        {business.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div>
+                <p className="text-[10px] lcd-text text-muted-foreground">Business Subcategory</p>
+                <p className="font-mono text-sm text-white mt-0.5">{businessSubcategory}</p>
               </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1">
-                    <Target className="w-3 h-3" /> Search Radius
-                  </label>
-                  <span className="text-primary font-mono text-sm font-bold">
-                    {radius[0]} km
-                  </span>
+              <div className="pt-2">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] lcd-text text-muted-foreground">Adjust Radius</label>
+                  <span className="text-primary font-mono text-xs font-bold">{radius[0]} km</span>
                 </div>
                 <Slider
                   value={radius}
@@ -745,6 +968,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
+          {/* Dynamic Business Resolver Panel */}
           <BusinessResolverPanel
             municipalityName={municipalityName}
             radiusKm={radius[0]}
@@ -756,1141 +980,667 @@ export default function Dashboard() {
             useCustomBusinessForMap={useCustomBusinessForMap}
             onUseCustomBusinessForMapChange={setUseCustomBusinessForMap}
             onBusinessResolutionChange={setBusinessResolution}
-            className="scada-panel border-white/5"
+            className="scada-panel border-white/5 shadow-md"
           />
 
-          <OperatingProfilePanel
-            municipalityName={municipalityName}
-            radiusKm={radius[0]}
-            businessSubcategory={businessSubcategory}
-            businessQuery={customBusinessQuery}
-            businessResolution={businessResolution as unknown as Record<string, unknown> | null}
-            customBusinessMapActive={businessInputMode === "custom" && useCustomBusinessForMap}
-            initialProfile={operatingProfile}
-          />
-
-          <LocationComparisonPanel
-            municipalityName={municipalityName}
-            businessSubcategory={businessSubcategory}
-            radiusKm={radius[0]}
-            onApplyScenario={({ municipality_name, business_subcategory, radius_km }) => {
-              setMunicipalityName(municipality_name);
-              setBusinessSubcategory(business_subcategory);
-              setRadius([radius_km]);
-            }}
-          />
-
-          <SiteAddressAnalysisPanel
-            municipalityName={municipalityName}
-            businessSubcategory={businessSubcategory}
-            businessQuery={customBusinessQuery}
-            radiusKm={Array.isArray(radius) ? radius[0] : Number(radius)}
-          />
-
-          <ScenarioSupportPanel
-            municipalityName={municipalityName}
-            businessSubcategory={businessSubcategory}
-            radiusKm={radius[0]}
-            businessInputMode={businessInputMode}
-            customBusinessQuery={customBusinessQuery}
-            useCustomBusinessForMap={useCustomBusinessForMap}
-            businessResolution={businessResolution}
-            className="scada-panel border-white/5"
-          />
-
+          {/* Validation Panel */}
           <Card className="scada-panel border-white/5">
+            <CardHeader className="pb-3 border-b border-white/5">
+              <CardTitle className="text-xs font-display tracking-wider uppercase text-white/95 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  System Diagnostics
+                </span>
+              </CardTitle>
+            </CardHeader>
             <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <History className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                      Scenario History
-                    </p>
-                    <p className="text-xs font-mono text-white/80 uppercase">
-                      {scenarioHistory.length} saved
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-primary border-primary/30">
-                  Compare
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  className="bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary-foreground font-mono text-xs uppercase"
-                  onClick={handleSaveScenario}
-                  disabled={isSavingScenario}
-                >
-                  <Save className={`w-3 h-3 mr-2 ${isSavingScenario ? "animate-pulse" : ""}`} />
-                  {isSavingScenario ? "Saving" : "Save"}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="bg-white/[0.03] hover:bg-white/[0.07] border-white/10 text-white font-mono text-xs uppercase"
-                  onClick={handleCompareScenarios}
-                  disabled={isComparingScenarios || scenarioHistory.length < 1}
-                >
-                  <GitCompare className={`w-3 h-3 mr-2 ${isComparingScenarios ? "animate-pulse" : ""}`} />
-                  Compare
-                </Button>
-              </div>
-
-              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                {scenarioHistory.slice(0, 4).map((item) => (
-                  <div key={item.scenario_id} className="rounded border border-white/10 bg-white/[0.03] p-2">
-                    <p className="text-[11px] font-mono text-white leading-snug">
-                      {item.business_subcategory}
-                    </p>
-                    <p className="text-[10px] text-white/50">
-                      {item.municipality_name} • {item.radius_km} km • {item.predicted_risk_class ?? "unknown"} risk
-                    </p>
-                    <p className="text-[10px] text-primary mt-1">
-                      {formatCurrency(item.predicted_monthly_net_revenue)} • {item.predicted_feasibility_score?.toFixed(1) ?? "N/A"}/100
-                    </p>
-                  </div>
-                ))}
-                {scenarioHistory.length === 0 && (
-                  <p className="text-[10px] text-white/50 leading-relaxed">
-                    Save a scenario to compare locations, business types, and confidence later.
-                  </p>
-                )}
-              </div>
-
-              {scenarioComparison && (
-                <div className="rounded border border-primary/20 bg-primary/[0.04] p-3 space-y-2">
-                  <p className="text-[10px] text-primary uppercase tracking-widest">
-                    Comparison Summary
-                  </p>
-                  <p className="text-[10px] text-white/65 leading-relaxed">
-                    {scenarioComparison.comparison_summary}
-                  </p>
-                  {scenarioComparison.rankings.slice(0, 2).map((item, index) => (
-                    <p key={item.scenario_id} className="text-[10px] text-white/70">
-                      #{index + 1} {item.label} — {item.overall_score.toFixed(1)}/100
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full bg-emerald-400/10 hover:bg-emerald-400/20 border-emerald-400/30 text-emerald-100 font-mono text-xs uppercase"
+                onClick={handleRunValidation}
+                disabled={isValidating}
+              >
+                {isValidating ? "Validating..." : "Run System Validation"}
+              </Button>
+              {systemValidation && (
+                <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                  {systemValidation.checks.map((check) => (
+                    <p
+                      key={check.name}
+                      className={`text-[10px] font-mono ${check.status === "passed" ? "text-emerald-300" : "text-destructive"}`}
+                    >
+                      {check.status === "passed" ? "PASS" : "FAIL"}: {check.name}
                     </p>
                   ))}
                 </div>
               )}
-
-              {scenarioHistory.length > 0 && (
-                <Button
-                  variant="ghost"
-                  className="w-full text-[10px] text-white/50 hover:text-white/80"
-                  onClick={handleClearHistory}
-                >
-                  Clear Saved Scenarios
-                </Button>
-              )}
             </CardContent>
           </Card>
 
-          <div className="scada-panel p-4 rounded-lg mt-auto">
-            <div className="flex items-center gap-3">
-              <Cpu className="w-8 h-8 text-primary/50 animate-pulse" />
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                  Processing Node
-                </p>
-                <p className="text-sm font-mono text-primary">ZN-ML-ACTIVE</p>
-              </div>
-            </div>
-          </div>
-
+          {/* ML Model Status */}
           <Card className="scada-panel border-white/5">
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <BrainCircuit
-                  className={`w-5 h-5 ${modelStatus?.status === "ready" ? "text-primary" : "text-accent"}`}
+                  className={`w-4 h-4 ${modelStatus?.status === "ready" ? "text-primary" : "text-accent"}`}
                 />
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                    ML Model Status
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Model Status
                   </p>
                   <p className="text-xs font-mono text-white/80 uppercase">
                     {modelStatus?.status ?? "unknown"}
                   </p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Rows</p>
-                  <p className="text-xs font-mono text-white">
-                    {modelStatus ? formatNumber(modelStatus.row_count) : "N/A"}
-                  </p>
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <div className="rounded border border-white/10 bg-white/[0.03] p-1.5 text-center">
+                  <p className="text-muted-foreground">Rows</p>
+                  <p className="font-mono text-white mt-0.5">{modelStatus ? formatNumber(modelStatus.row_count) : "N/A"}</p>
                 </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Features</p>
-                  <p className="text-xs font-mono text-white">
-                    {modelStatus?.feature_count ?? "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Risk Acc.</p>
-                  <p className="text-xs font-mono text-primary">
-                    {formatPercent(modelStatus?.risk_accuracy)}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Revenue R²</p>
-                  <p className="text-xs font-mono text-primary">
-                    {modelStatus?.revenue_r2?.toFixed(3) ?? "N/A"}
-                  </p>
+                <div className="rounded border border-white/10 bg-white/[0.03] p-1.5 text-center">
+                  <p className="text-muted-foreground">Accuracy</p>
+                  <p className="font-mono text-primary mt-0.5">{formatPercent(modelStatus?.risk_accuracy)}</p>
                 </div>
               </div>
-
-              <p className="text-[10px] text-white/50 leading-relaxed">
-                {modelStatus?.important_note ??
-                  "Model metadata is not available yet."}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="scada-panel border-white/5">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Gauge className="w-5 h-5 text-accent" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                      Prediction Credibility
-                    </p>
-                    <p className="text-xs font-mono text-white/80 uppercase">
-                      {credibility?.confidence_level ?? "unknown"}
-                    </p>
-                  </div>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={credibilityClass(credibility?.confidence_level)}
-                >
-                  {credibility?.overall_confidence_score?.toFixed(1) ?? "N/A"}/100
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Data</p>
-                  <p className="text-xs font-mono text-white">
-                    {credibility?.data_quality_score?.toFixed(0) ?? "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Model</p>
-                  <p className="text-xs font-mono text-white">
-                    {credibility?.model_signal_score?.toFixed(0) ?? "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Proxy</p>
-                  <p className="text-xs font-mono text-white">
-                    {credibility?.proxy_dependency_score?.toFixed(0) ?? "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-[10px] text-white/50 leading-relaxed">
-                {credibility?.user_facing_disclaimer ??
-                  "Credibility profile is not available for this scenario."}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="scada-panel border-white/5">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-emerald-400" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                      Demand Evidence
-                    </p>
-                    <p className="text-xs font-mono text-white/80 uppercase">
-                      {demandEvidence ? demandEvidence.credibility : "fallback proxy"}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-emerald-400 border-emerald-400/30 uppercase">
-                  {demandEvidence ? demandEvidence.demand_level : "Proxy"}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Demand Index</p>
-                  <p className="text-xs font-mono text-emerald-400">
-                    {demandEvidence?.demand_pressure_index?.toFixed(1) ?? "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Target Pool</p>
-                  <p className="text-xs font-mono text-white">
-                    {demandEvidence ? formatNumber(demandEvidence.target_customer_pool_estimate) : "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Foot Traffic</p>
-                  <p className="text-xs font-mono text-white">
-                    {demandEvidence?.foot_traffic_proxy_index?.toFixed(1) ?? "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Transit</p>
-                  <p className="text-xs font-mono text-white">
-                    {demandEvidence?.transit_access_proxy_index?.toFixed(1) ?? "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-[10px] text-white/50 leading-relaxed">
-                {demandEvidence
-                  ? demandEvidence.data_quality_note
-                  : "No demand evidence row exists for this selected scenario yet. The backend is using an explicit fallback proxy."}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="scada-panel border-white/5">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Database className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                      Competition Evidence
-                    </p>
-                    <p className="text-xs font-mono text-white/80 uppercase">
-                      {competitionEvidence ? competitionEvidence.credibility : "fallback proxy"}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-primary border-primary/30">
-                  {competitionEvidence ? "Catalog" : "Proxy"}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Competitors</p>
-                  <p className="text-xs font-mono text-white">
-                    {competitionEvidence?.observed_competitor_count ?? "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Density</p>
-                  <p className="text-xs font-mono text-white">
-                    {competitionEvidence?.competitor_density_per_10k?.toFixed(2) ?? "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Nearest</p>
-                  <p className="text-xs font-mono text-white">
-                    {competitionEvidence?.nearest_competitor_distance_km != null
-                      ? `${competitionEvidence.nearest_competitor_distance_km.toFixed(1)} km`
-                      : "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Pressure</p>
-                  <p className="text-xs font-mono text-primary">
-                    {competitionEvidence?.competition_pressure_index?.toFixed(1) ?? "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-[10px] text-white/50 leading-relaxed">
-                {competitionEvidence
-                  ? competitionEvidence.source_method
-                  : "No catalog row exists for this selected scenario yet. The backend is using an explicit fallback proxy."}
-              </p>
-            </CardContent>
-          </Card>
-
-
-
-          <Card className="scada-panel border-white/5">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-accent" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                      Lease Cost Evidence
-                    </p>
-                    <p className="text-xs font-mono text-white/80 uppercase">
-                      {leaseCostEvidence ? leaseCostEvidence.credibility : "fallback proxy"}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-accent border-accent/30">
-                  {leaseCostEvidence ? leaseCostEvidence.commercial_cost_pressure_level : "Proxy"}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Median</p>
-                  <p className="text-xs font-mono text-white">
-                    {formatCurrency(leaseCostEvidence?.median_monthly_lease_cost)}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Range</p>
-                  <p className="text-xs font-mono text-white">
-                    {leaseCostEvidence
-                      ? `${formatCurrency(leaseCostEvidence.low_monthly_lease_cost)} - ${formatCurrency(leaseCostEvidence.high_monthly_lease_cost)}`
-                      : "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">$/Sq Ft/Yr</p>
-                  <p className="text-xs font-mono text-white">
-                    {leaseCostEvidence?.lease_cost_per_sqft_year != null
-                      ? `$${leaseCostEvidence.lease_cost_per_sqft_year.toFixed(2)}`
-                      : "N/A"}
-                  </p>
-                </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-2">
-                  <p className="text-[9px] text-muted-foreground uppercase">Pressure</p>
-                  <p className="text-xs font-mono text-accent">
-                    {leaseCostEvidence?.rent_pressure_index?.toFixed(1) ?? "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-[10px] text-white/50 leading-relaxed">
-                {leaseCostEvidence
-                  ? leaseCostEvidence.data_quality_note
-                  : "No lease evidence row exists for this selected scenario yet. The backend is using an explicit fallback proxy range."}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="scada-panel border-white/5">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck
-                    className={`w-5 h-5 ${systemValidation?.overall_status === "failed" ? "text-destructive" : "text-emerald-400"}`}
-                  />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                      System Validation
-                    </p>
-                    <p className="text-xs font-mono text-white/80">
-                      {systemValidation
-                        ? `${systemValidation.passed_checks}/${systemValidation.total_checks} checks passed`
-                        : "Not checked yet"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full bg-emerald-400/10 hover:bg-emerald-400/20 border-emerald-400/30 text-emerald-100 font-mono text-xs uppercase tracking-wider"
-                onClick={handleRunValidation}
-                disabled={isValidating}
-              >
-                <ShieldCheck
-                  className={`w-4 h-4 mr-2 ${isValidating ? "animate-pulse" : ""}`}
-                />
-                {isValidating ? "Running..." : "Run Validation"}
-              </Button>
-
-              {systemValidation && (
-                <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                  {systemValidation.checks.map((check) => (
-                    <p
-                      key={check.name}
-                      className={`text-[10px] font-mono ${check.status === "passed" ? "text-emerald-300" : "text-destructive"}`}
-                    >
-                      {check.status === "passed" ? "PASS" : "FAIL"}:{" "}
-                      {check.name}
-                    </p>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
 
+        {/* Right Workspace (Tabbed Content View) */}
         <div className="lg:col-span-9 flex flex-col gap-6">
-          <div className="flex items-center gap-2 mb-[-8px]">
-            <BarChart4 className="w-5 h-5 text-muted-foreground" />
-            <h2 className="text-lg font-display text-white/90">
-              Environment Sensors
-            </h2>
-          </div>
-
-          <MarketMapPanel geoContext={geoContext} />
-
-          <ScenarioAIChat
-            municipalityName={municipalityName}
-            businessSubcategory={businessSubcategory}
-            radiusKm={radius[0]}
-          />
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="scada-panel relative group">
-              <div className="absolute top-0 right-0 w-8 h-8 bg-primary/10 rounded-bl-xl border-b border-l border-primary/20 flex items-center justify-center">
-                <Users className="w-4 h-4 text-primary" />
-              </div>
-              <CardContent className="p-5">
-                <p className="text-xs lcd-text text-muted-foreground mb-1">
-                  Total Population
-                </p>
-                <p className="text-3xl data-value">
-                  {formatNumber(populationValue)}
-                </p>
-                <p className="text-[10px] text-emerald-400 mt-2 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" />{" "}
-                  {dashboardData.municipality_name}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="scada-panel relative">
-              <div className="absolute top-0 right-0 w-8 h-8 bg-accent/10 rounded-bl-xl border-b border-l border-accent/20 flex items-center justify-center">
-                <MapPin className="w-4 h-4 text-accent" />
-              </div>
-              <CardContent className="p-5">
-                <p className="text-xs lcd-text text-muted-foreground mb-1">
-                  Competition Pressure Estimate
-                </p>
-                <p
-                  className={`text-3xl font-mono ${indicatorTextClass(dashboardData.competition_monitor.indicator)}`}
+          
+          {/* Navigation Tabs */}
+          <nav className="flex items-center gap-1 bg-slate-950/80 p-1.5 rounded-xl border border-white/10 overflow-x-auto scrollbar-hide">
+            {[
+              { id: "overview", label: "Overview", icon: BarChart4 },
+              { id: "map", label: "Geospatial Map", icon: MapPin },
+              { id: "evidence", label: "Evidence Indicators", icon: Database },
+              { id: "benchmarks", label: "Benchmarks Profile", icon: DollarSign },
+              { id: "history", label: "Compare Locations", icon: GitCompare },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-mono text-xs uppercase tracking-wider transition-all duration-200 shrink-0 ${
+                    isActive
+                      ? "bg-primary text-white shadow-lg shadow-primary/20 font-bold"
+                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                  }`}
                 >
-                  {indicatorLabelForCompetition(
-                    dashboardData.competition_monitor.indicator,
-                  )}
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-2">
-                  {dashboardData.competition_monitor.value}
-                </p>
-              </CardContent>
-            </Card>
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
 
-            <Card className="scada-panel relative">
-              <div className="absolute top-0 right-0 w-8 h-8 bg-primary/10 rounded-bl-xl border-b border-l border-primary/20 flex items-center justify-center">
-                <DollarSign className="w-4 h-4 text-primary" />
-              </div>
-              <CardContent className="p-5">
-                <p className="text-xs lcd-text text-muted-foreground mb-1">
-                  Prototype Revenue Estimate
-                </p>
-                <p
-                  className={`text-2xl font-mono ${indicatorTextClass(dashboardData.revenue_monitor.indicator)}`}
-                >
-                  {formatCurrency(ml?.predicted_monthly_net_revenue)}
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-2">
-                  {indicatorLabelForRevenue(
-                    dashboardData.revenue_monitor.indicator,
-                  )}
-                </p>
-              </CardContent>
-            </Card>
+          {/* Active Tab Panel Render */}
+          <div className="min-h-[500px]">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+              >
+                
+                {/* 1. OVERVIEW TAB */}
+                {activeTab === "overview" && (
+                  <>
+                    {/* Recommendation Decision Card */}
+                    {recommendationDecision && (
+                      <Card className="scada-panel border-white/10 bg-primary/[0.02]">
+                        <CardContent className="p-6 space-y-4">
+                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/5 pb-3">
+                            <div>
+                              <p className="text-[10px] text-primary uppercase tracking-widest font-mono">
+                                Unified Feasibility Recommendation
+                              </p>
+                              <h3 className="text-xl font-bold text-white mt-1">
+                                {recommendationDecision.decision_summary}
+                              </h3>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={`text-sm py-1 px-3 rounded-full font-mono uppercase ${recommendationBadgeClass(recommendationDecision.final_recommendation)}`}
+                            >
+                              {recommendationDecision.recommendation_label}
+                            </Badge>
+                          </div>
+                          
+                          <p className="text-sm text-slate-300 leading-relaxed">
+                            {recommendationDecision.action_guidance}
+                          </p>
 
-            <Card className="scada-panel relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-8 h-8 bg-destructive/10 rounded-bl-xl border-b border-l border-destructive/20 flex items-center justify-center z-10">
-                <AlertTriangle
-                  className={`w-4 h-4 ${indicatorTextClass(dashboardData.risk_monitor.indicator)}`}
-                />
-              </div>
-              <CardContent className="p-5 relative z-10">
-                <p className="text-xs lcd-text text-muted-foreground mb-1">
-                  Prototype Risk Estimate
-                </p>
-                <p
-                  className={`text-3xl font-mono ${indicatorTextClass(dashboardData.risk_monitor.indicator)}`}
-                >
-                  {ml?.predicted_risk_class?.toUpperCase() ??
-                    indicatorLabelForRisk(dashboardData.risk_monitor.indicator)}
-                </p>
-                <p className="text-[10px] text-white/60 mt-2 uppercase tracking-widest">
-                  {dashboardData.risk_monitor.value}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[300px]">
-            <Card className="scada-panel flex flex-col h-full">
-              <CardHeader className="pb-0 pt-4 px-5">
-                <CardTitle className="text-sm lcd-text text-white/80 flex justify-between">
-                  <span>Population Coverage Trend</span>
-                  <span className="text-primary font-mono">
-                    {formatNumber(populationValue)} people
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 p-0 px-2 pb-2 mt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={populationTrend}
-                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="colorPop" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="5%"
-                          stopColor="hsl(var(--primary))"
-                          stopOpacity={0.4}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="hsl(var(--primary))"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(255,255,255,0.05)"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="time"
-                      stroke="rgba(255,255,255,0.2)"
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="rgba(255,255,255,0.2)"
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(val) =>
-                        `${Math.round(Number(val) / 1000)}k`
-                      }
-                    />
-                    <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor: "rgba(15, 23, 42, 0.9)",
-                        borderColor: "rgba(6, 182, 212, 0.3)",
-                        borderRadius: "4px",
-                      }}
-                      itemStyle={{ color: "#06b6d4" }}
-                      formatter={(value: number) => [
-                        `${value.toLocaleString()} people`,
-                        "Population",
-                      ]}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="value"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorPop)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="scada-panel flex flex-col h-full">
-              <CardHeader className="pb-0 pt-4 px-5">
-                <CardTitle className="text-sm lcd-text text-white/80 flex justify-between">
-                  <span>Demographic Distribution</span>
-                  <span className="text-muted-foreground font-mono text-xs">
-                    RAD: {radius[0]}km
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 p-0 px-2 pb-4 mt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={demographicChartData}
-                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(255,255,255,0.05)"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="group"
-                      stroke="rgba(255,255,255,0.3)"
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="rgba(255,255,255,0.2)"
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor: "rgba(15, 23, 42, 0.9)",
-                        borderColor: "rgba(255,255,255,0.1)",
-                        borderRadius: "4px",
-                      }}
-                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                      formatter={(value: number) => [`${value}%`, "Value"]}
-                    />
-                    <Bar dataKey="value" radius={[2, 2, 0, 0]}>
-                      {demographicChartData.map((_, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={
-                            index % 2 === 0
-                              ? "hsl(var(--primary))"
-                              : "hsl(var(--accent))"
-                          }
-                          fillOpacity={0.8}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="scada-panel border-white/5 bg-background/50 md:col-span-2">
-              <CardContent className="p-5">
-                <p className="text-xs lcd-text text-muted-foreground mb-1">
-                  ML Prediction Summary
-                </p>
-                <p className="text-sm text-white/80 max-w-[680px]">
-                  {dashboardData.people_location_packet.summary_text}
-                </p>
-
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <Badge
-                    variant="outline"
-                    className={indicatorBadgeClass(
-                      dashboardData.people_location_packet.indicator,
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            <div className="space-y-2">
+                              <p className="text-xs font-mono text-emerald-400 uppercase tracking-wider">
+                                Primary Strengths
+                              </p>
+                              <ul className="space-y-1.5">
+                                {recommendationDecision.major_strengths.map((item) => (
+                                  <li key={item} className="text-xs text-slate-300 flex items-start gap-2">
+                                    <span className="text-emerald-400 font-bold">•</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-xs font-mono text-destructive uppercase tracking-wider">
+                                Risk Factors / Concerns
+                              </p>
+                              <ul className="space-y-1.5">
+                                {recommendationDecision.major_concerns.map((item) => (
+                                  <li key={item} className="text-xs text-slate-300 flex items-start gap-2">
+                                    <span className="text-destructive font-bold">•</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     )}
-                  >
-                    {dashboardData.people_location_packet.indicator.toUpperCase()}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="text-primary border-primary/30"
-                  >
-                    City: {dashboardData.municipality_name}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="text-white/80 border-white/20"
-                  >
-                    Type: {dashboardData.business_subcategory}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className={recommendationBadgeClass(recommendationDecision?.final_recommendation ?? ml?.recommendation)}
-                  >
-                    {recommendationDecision?.recommendation_label ?? readableRecommendation(ml?.recommendation)}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className={credibilityClass(credibility?.confidence_level)}
-                  >
-                    Confidence: {credibility?.confidence_level?.toUpperCase() ?? "UNKNOWN"}
-                  </Badge>
-                </div>
 
-                {recommendationDecision && (
-                  <div className="mt-4 rounded border border-primary/20 bg-primary/[0.04] p-4 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                          Decision-Support Recommendation
-                        </p>
-                        <p className="text-sm text-white/85 mt-1">
-                          {recommendationDecision.decision_summary}
-                        </p>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={recommendationBadgeClass(recommendationDecision.final_recommendation)}
-                      >
-                        {recommendationDecision.recommendation_label}
-                      </Badge>
+                    {/* KPI Cards Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <Card className="scada-panel">
+                        <CardContent className="p-5">
+                          <p className="text-[10px] lcd-text text-muted-foreground">Total Population</p>
+                          <p className="text-3xl data-value mt-1">{formatNumber(populationValue)}</p>
+                          <p className="text-[10px] text-slate-500 mt-2 font-mono">{municipalityName}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="scada-panel">
+                        <CardContent className="p-5">
+                          <p className="text-[10px] lcd-text text-muted-foreground">Feasibility Score</p>
+                          <p className="text-3xl data-value-accent mt-1">
+                            {ml?.predicted_feasibility_score?.toFixed(1) ?? "N/A"}/100
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-2 font-mono">Simulated Score</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="scada-panel">
+                        <CardContent className="p-5">
+                          <p className="text-[10px] lcd-text text-muted-foreground">Revenue Estimate</p>
+                          <p className={`text-2xl font-mono mt-1.5 font-bold ${indicatorTextClass(dashboardData.revenue_monitor.indicator)}`}>
+                            {formatCurrency(ml?.predicted_monthly_net_revenue)}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-2 font-mono">Net Profit/Month</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="scada-panel">
+                        <CardContent className="p-5">
+                          <p className="text-[10px] lcd-text text-muted-foreground">Risk Forecast</p>
+                          <p className={`text-3xl font-mono mt-1 font-bold ${indicatorTextClass(dashboardData.risk_monitor.indicator)}`}>
+                            {ml?.predicted_risk_class?.toUpperCase() ?? "N/A"}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-2 font-mono">ML Risk Index</p>
+                        </CardContent>
+                      </Card>
                     </div>
-                    <p className="text-xs text-white/65 leading-relaxed">
-                      {recommendationDecision.action_guidance}
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-[10px] text-emerald-400 uppercase mb-1">Major Strengths</p>
-                        <ul className="space-y-1">
-                          {recommendationDecision.major_strengths.slice(0, 3).map((item) => (
-                            <li key={item} className="text-[11px] text-white/70 leading-relaxed">
-                              • {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-destructive uppercase mb-1">Major Concerns</p>
-                        <ul className="space-y-1">
-                          {recommendationDecision.major_concerns.slice(0, 3).map((item) => (
-                            <li key={item} className="text-[11px] text-white/70 leading-relaxed">
-                              • {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+
+                    {/* Chart visualizations */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
+                      <Card className="scada-panel flex flex-col h-full">
+                        <CardHeader className="pb-0 pt-4 px-5">
+                          <CardTitle className="text-xs lcd-text text-white/80">Population Coverage Area</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 p-0 px-2 pb-2 mt-2">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={populationTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id="colorPop" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                              <XAxis dataKey="time" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
+                              <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${Math.round(Number(val) / 1000)}k`} />
+                              <RechartsTooltip contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.9)", borderColor: "rgba(6, 182, 212, 0.3)", borderRadius: "4px" }} itemStyle={{ color: "#06b6d4" }} formatter={(value: number) => [`${value.toLocaleString()} people`, "Population"]} />
+                              <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#colorPop)" />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="scada-panel flex flex-col h-full">
+                        <CardHeader className="pb-0 pt-4 px-5">
+                          <CardTitle className="text-xs lcd-text text-white/80">Demographic Segment Distribution</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 p-0 px-2 pb-4 mt-2">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={demographicChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                              <XAxis dataKey="group" stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} />
+                              <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
+                              <RechartsTooltip contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.9)", borderColor: "rgba(255,255,255,0.1)", borderRadius: "4px" }} cursor={{ fill: "rgba(255,255,255,0.05)" }} formatter={(value: number) => [`${value}%`, "Value"]} />
+                              <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                                {demographicChartData.map((_, index) => (
+                                  <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "hsl(var(--primary))" : "hsl(var(--accent))"} fillOpacity={0.8} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Explanations & Driver breakdown */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <Card className="scada-panel md:col-span-2">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90">Prediction Explanation Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-xs text-slate-300 leading-relaxed">
+                          <p>{explanation?.revenue_explanation}</p>
+                          <p>{explanation?.risk_explanation}</p>
+                          <p>{explanation?.feasibility_explanation}</p>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="scada-panel">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90">Main Drivers</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div>
+                            <p className="text-[9px] text-emerald-400 font-mono uppercase tracking-widest mb-1.5">Positive Factors</p>
+                            <div className="space-y-1">
+                              {(explanation?.top_positive_factors ?? []).map((factor) => (
+                                <p key={factor} className="text-xs text-slate-300 border-l border-emerald-400/30 pl-2">{factor}</p>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[9px] text-destructive font-mono uppercase tracking-widest mb-1.5">Negative Factors</p>
+                            <div className="space-y-1">
+                              {(explanation?.top_negative_factors ?? []).map((factor) => (
+                                <p key={factor} className="text-xs text-slate-300 border-l border-destructive/30 pl-2">{factor}</p>
+                              ))}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </>
+                )}
+
+                {/* 2. GEOSPATIAL MAP TAB */}
+                {activeTab === "map" && (
+                  <>
+                    <MarketMapPanel geoContext={geoContext} />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Site Address Panel */}
+                      <SiteAddressAnalysisPanel
+                        municipalityName={municipalityName}
+                        businessSubcategory={businessSubcategory}
+                        businessQuery={customBusinessQuery}
+                        radiusKm={radius[0]}
+                      />
+                      
+                      {/* Spatial Support Level */}
+                      <ScenarioSupportPanel
+                        municipalityName={municipalityName}
+                        businessSubcategory={businessSubcategory}
+                        radiusKm={radius[0]}
+                        businessInputMode={businessInputMode}
+                        customBusinessQuery={customBusinessQuery}
+                        useCustomBusinessForMap={useCustomBusinessForMap}
+                        businessResolution={businessResolution}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* 3. EVIDENCE INDICATORS TAB */}
+                {activeTab === "evidence" && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Demand Card */}
+                    <Card className="scada-panel border-white/5">
+                      <CardContent className="p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-emerald-400" />
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase font-mono">Demand Evidence</p>
+                              <p className="text-xs font-mono text-white/80">{demandEvidence ? demandEvidence.credibility : "Fallback Proxy"}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-emerald-400 border-emerald-400/30 uppercase font-mono text-[10px]">
+                            {demandEvidence ? demandEvidence.demand_level : "Proxy"}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">DEMAND INDEX</p>
+                            <p className="text-sm text-emerald-400 mt-0.5">{demandEvidence?.demand_pressure_index?.toFixed(1) ?? "N/A"}</p>
+                          </div>
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">CUSTOMER POOL</p>
+                            <p className="text-sm text-white mt-0.5">{demandEvidence ? formatNumber(demandEvidence.target_customer_pool_estimate) : "N/A"}</p>
+                          </div>
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">FOOT TRAFFIC</p>
+                            <p className="text-sm text-white mt-0.5">{demandEvidence?.foot_traffic_proxy_index?.toFixed(1) ?? "N/A"}</p>
+                          </div>
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">TRANSIT INDEX</p>
+                            <p className="text-sm text-white mt-0.5">{demandEvidence?.transit_access_proxy_index?.toFixed(1) ?? "N/A"}</p>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                          {demandEvidence ? demandEvidence.data_quality_note : "No catalog row exists for this selected scenario. Using explicit fallback proxy index."}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Competition Card */}
+                    <Card className="scada-panel border-white/5">
+                      <CardContent className="p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                          <div className="flex items-center gap-2">
+                            <Database className="w-5 h-5 text-primary" />
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase font-mono">Competition Evidence</p>
+                              <p className="text-xs font-mono text-white/80">{competitionEvidence ? competitionEvidence.credibility : "Fallback Proxy"}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-primary border-primary/30 uppercase font-mono text-[10px]">
+                            {competitionEvidence ? "Catalog" : "Proxy"}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">COMPETITORS</p>
+                            <p className="text-sm text-white mt-0.5">{competitionEvidence?.observed_competitor_count ?? "N/A"}</p>
+                          </div>
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">DENSITY / 10K</p>
+                            <p className="text-sm text-white mt-0.5">{competitionEvidence?.competitor_density_per_10k?.toFixed(2) ?? "N/A"}</p>
+                          </div>
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">NEAREST POI</p>
+                            <p className="text-sm text-white mt-0.5">
+                              {competitionEvidence?.nearest_competitor_distance_km != null ? `${competitionEvidence.nearest_competitor_distance_km.toFixed(1)} km` : "N/A"}
+                            </p>
+                          </div>
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">COMP. PRESSURE</p>
+                            <p className="text-sm text-primary mt-0.5">{competitionEvidence?.competition_pressure_index?.toFixed(1) ?? "N/A"}</p>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                          {competitionEvidence ? competitionEvidence.source_method : "No catalog row exists for this selected scenario. Using explicit fallback proxy distance."}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Lease Cost Card */}
+                    <Card className="scada-panel border-white/5">
+                      <CardContent className="p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-5 h-5 text-accent" />
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase font-mono">Lease Cost Evidence</p>
+                              <p className="text-xs font-mono text-white/80">{leaseCostEvidence ? leaseCostEvidence.credibility : "Fallback Proxy"}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-accent border-accent/30 uppercase font-mono text-[10px]">
+                            {leaseCostEvidence ? leaseCostEvidence.commercial_cost_pressure_level : "Proxy"}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">MEDIAN LEASE</p>
+                            <p className="text-sm text-white mt-0.5">{formatCurrency(leaseCostEvidence?.median_monthly_lease_cost)}</p>
+                          </div>
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                            <p className="text-[9px] text-muted-foreground">COST / SQFT / YR</p>
+                            <p className="text-sm text-white mt-0.5">
+                              {leaseCostEvidence?.lease_cost_per_sqft_year != null ? `$${leaseCostEvidence.lease_cost_per_sqft_year.toFixed(2)}` : "N/A"}
+                            </p>
+                          </div>
+                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded col-span-2">
+                            <p className="text-[9px] text-muted-foreground">MONTHLY ESTIMATE RANGE</p>
+                            <p className="text-xs text-white mt-0.5">
+                              {leaseCostEvidence ? `${formatCurrency(leaseCostEvidence.low_monthly_lease_cost)} - ${formatCurrency(leaseCostEvidence.high_monthly_lease_cost)}` : "N/A"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                          {leaseCostEvidence ? leaseCostEvidence.data_quality_note : "No lease evidence row exists for this selected scenario. Using explicit fallback range."}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Data Credibility Audits */}
+                    <Card className="scada-panel border-white/5 md:col-span-3">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-center">
+                          <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90">Prediction Credibility Audit</CardTitle>
+                          <Badge variant="outline" className={credibilityClass(credibility?.confidence_level)}>
+                            {credibility?.confidence_level?.toUpperCase()} CONFIDENCE · {credibility?.overall_confidence_score?.toFixed(1)}/100
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4 text-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <p className="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">Observed Real Data</p>
+                            <div className="space-y-1">
+                              {(credibility?.observed_inputs ?? []).slice(0, 3).map((item) => (
+                                <p key={item.field_name} className="p-2 border border-white/5 bg-white/[0.01] rounded">
+                                  <strong className="text-white font-mono">{item.label}:</strong> {item.user_note}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] text-accent font-mono uppercase tracking-widest">Estimated Proxy Data</p>
+                            <div className="space-y-1">
+                              {(credibility?.proxy_estimated_inputs ?? []).slice(0, 3).map((item) => (
+                                <p key={item.field_name} className="p-2 border border-accent/10 bg-accent/[0.01] rounded">
+                                  <strong className="text-accent font-mono">{item.label}:</strong> {item.user_note}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* 4. OPERATING BENCHMARKS TAB */}
+                {activeTab === "benchmarks" && (
+                  <div className="space-y-6">
+                    <OperatingProfilePanel
+                      municipalityName={municipalityName}
+                      radiusKm={radius[0]}
+                      businessSubcategory={businessSubcategory}
+                      businessQuery={customBusinessQuery}
+                      businessResolution={businessResolution as unknown as Record<string, unknown> | null}
+                      customBusinessMapActive={businessInputMode === "custom" && useCustomBusinessForMap}
+                      initialProfile={operatingProfile}
+                    />
+                  </div>
+                )}
+
+                {/* 5. HISTORY & COMPARISONS TAB */}
+                {activeTab === "history" && (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left comparison control and history list */}
+                    <Card className="scada-panel border-white/5 lg:col-span-4 h-full">
+                      <CardHeader className="pb-3 border-b border-white/5">
+                        <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90">Scenario Controls</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-4">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            className="bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary-foreground font-mono text-xs uppercase"
+                            onClick={handleSaveScenario}
+                            disabled={isSavingScenario}
+                          >
+                            <Save className={`w-3.5 h-3.5 mr-1.5 ${isSavingScenario ? "animate-pulse" : ""}`} />
+                            {isSavingScenario ? "Saving" : "Save Active"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="bg-white/[0.03] hover:bg-white/[0.07] border-white/10 text-white font-mono text-xs uppercase"
+                            onClick={handleCompareScenarios}
+                            disabled={isComparingScenarios || scenarioHistory.length < 1}
+                          >
+                            <GitCompare className={`w-3.5 h-3.5 mr-1.5 ${isComparingScenarios ? "animate-pulse" : ""}`} />
+                            Run Compare
+                          </Button>
+                        </div>
+
+                        {scenarioHistory.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            className="w-full text-[10px] text-white/50 hover:text-white/80 uppercase font-mono"
+                            onClick={handleClearHistory}
+                          >
+                            Clear Comparison History
+                          </Button>
+                        )}
+
+                        <div className="space-y-2 border-t border-white/5 pt-4">
+                          <p className="text-[10px] text-muted-foreground uppercase font-mono">Saved Scenarios ({scenarioHistory.length})</p>
+                          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                            {scenarioHistory.map((item) => (
+                              <div key={item.scenario_id} className="rounded border border-white/10 bg-white/[0.02] p-3 text-xs">
+                                <p className="font-mono text-white font-semibold">{item.business_subcategory}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{item.municipality_name} • {item.radius_km} km</p>
+                                <p className="text-[10px] text-primary font-mono mt-1">
+                                  {formatCurrency(item.predicted_monthly_net_revenue)} • Score: {item.predicted_feasibility_score?.toFixed(1) ?? "N/A"}
+                                </p>
+                              </div>
+                            ))}
+                            {scenarioHistory.length === 0 && (
+                              <p className="text-[10px] text-slate-500 italic">No saved scenarios yet. Click &apos;Save Active&apos; to add the current workspace parameters.</p>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Right comparison matrix view */}
+                    <div className="lg:col-span-8 space-y-6">
+                      <LocationComparisonPanel
+                        municipalityName={municipalityName}
+                        businessSubcategory={businessSubcategory}
+                        radiusKm={radius[0]}
+                        onApplyScenario={({ municipality_name, business_subcategory, radius_km }) => {
+                          setMunicipalityName(municipality_name);
+                          setBusinessSubcategory(business_subcategory);
+                          setRadius([radius_km]);
+                        }}
+                      />
+
+                      {scenarioComparison && (
+                        <Card className="scada-panel border-white/10 bg-accent/[0.01]">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-xs font-display tracking-wider uppercase text-accent">Comparison Summary Insights</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                              {scenarioComparison.comparison_summary}
+                            </p>
+                            
+                            <div className="space-y-2 border-t border-white/5 pt-3">
+                              <p className="text-[10px] text-muted-foreground uppercase font-mono">Rankings Matrix</p>
+                              {scenarioComparison.rankings.map((item, index) => (
+                                <div key={item.scenario_id} className="flex justify-between items-center p-2.5 rounded bg-white/[0.01] border border-white/5 text-xs">
+                                  <span className="font-mono text-slate-300">
+                                    <strong className="text-white">#{index + 1}</strong> {item.label}
+                                  </span>
+                                  <span className="font-mono text-accent font-bold">{item.overall_score.toFixed(1)}/100</span>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
                     </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                  <div className="rounded border border-white/10 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Prototype Feasibility
-                    </p>
-                    <p className="text-lg font-mono text-primary">
-                      {ml?.predicted_feasibility_score?.toFixed(1) ?? "N/A"}/100
-                    </p>
-                  </div>
-                  <div className="rounded border border-white/10 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Density
-                    </p>
-                    <p className="text-lg font-mono text-white">
-                      {density ? formatNumber(density) : "N/A"}
-                    </p>
-                  </div>
-                  <div className="rounded border border-white/10 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Median Income
-                    </p>
-                    <p className="text-lg font-mono text-white">
-                      {medianIncome ? formatCurrency(medianIncome) : "N/A"}
-                    </p>
-                  </div>
-                  <div className="rounded border border-white/10 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Competition
-                    </p>
-                    <p className="text-lg font-mono text-white">
-                      {explanation?.competition_score?.toFixed(1) ?? "N/A"}/100
-                    </p>
-                  </div>
-                  <div className="rounded border border-white/10 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Demand
-                    </p>
-                    <p className="text-lg font-mono text-white">
-                      {explanation?.demand_score?.toFixed(1) ?? "N/A"}/100
-                    </p>
-                  </div>
-                  <div className="rounded border border-white/10 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Lease Estimate
-                    </p>
-                    <p className="text-lg font-mono text-white">
-                      {formatCurrency(explanation?.monthly_lease_cost_estimate)}
-                    </p>
-                  </div>
-                  <div className="rounded border border-white/10 bg-white/[0.03] p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Data Source
-                    </p>
-                    <p className="text-lg font-mono text-white flex items-center gap-2">
-                      <Database className="w-4 h-4 text-primary" />
-                      {dashboardData.people_location_packet.meta.data_source ||
-                        "API"}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="scada-panel border-white/5 bg-background/50">
-              <CardContent className="p-5">
-                <p className="text-xs lcd-text text-muted-foreground mb-3">
-                  Prototype Risk Probability
-                </p>
-                <div className="space-y-3">
-                  {riskProbabilityData.map((item) => (
-                    <div key={item.riskClass}>
-                      <div className="flex justify-between text-xs font-mono text-white/80 mb-1">
-                        <span>{item.riskClass}</span>
-                        <span>{item.probability}%</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.max(2, item.probability)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex items-baseline gap-4 flex-wrap mt-5">
-                  <p className="text-sm font-mono text-white">
-                    Youth: {studentPct}%
-                  </p>
-                  <p className="text-sm font-mono text-white">
-                    Families: {familiesPct}%
-                  </p>
-                  <p className="text-sm font-mono text-white">
-                    Seniors: {retireesPct}%
-                  </p>
-                </div>
-
-                <p className="text-[10px] text-muted-foreground uppercase mt-2">
-                  Status:{" "}
-                  {dashboardData.people_location_packet.meta.status ||
-                    "unknown"}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="scada-panel border-white/5 bg-background/50">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs lcd-text text-muted-foreground">
-                    Demand Analysis
-                  </p>
-                  <Badge
-                    variant="outline"
-                    className="text-primary border-primary/30 uppercase"
-                  >
-                    {breakdown?.demand_analysis.level ?? "N/A"}
-                  </Badge>
-                </div>
-                <p className="text-3xl font-mono text-primary mb-2">
-                  {breakdown?.demand_analysis.score?.toFixed(1) ?? "N/A"}/100
-                </p>
-                <p className="text-xs text-white/75 leading-relaxed">
-                  {breakdown?.demand_analysis.summary ??
-                    "Demand analysis is not available for this scenario."}
-                </p>
-                <div className="space-y-2 mt-4">
-                  {(breakdown?.demand_analysis.signals ?? [])
-                    .slice(0, 2)
-                    .map((signal) => (
-                      <p
-                        key={signal}
-                        className="text-[11px] text-white/60 border-l border-primary/40 pl-2"
-                      >
-                        {signal}
-                      </p>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="scada-panel border-white/5 bg-background/50">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs lcd-text text-muted-foreground">
-                    Competition Evidence Analysis
-                  </p>
-                  <Badge
-                    variant="outline"
-                    className={indicatorBadgeClass(
-                      dashboardData.competition_monitor.indicator,
-                    )}
-                  >
-                    {breakdown?.competition_analysis.level ?? "N/A"}
-                  </Badge>
-                </div>
-                <p
-                  className={`text-3xl font-mono mb-2 ${indicatorTextClass(dashboardData.competition_monitor.indicator)}`}
-                >
-                  {breakdown?.competition_analysis.score?.toFixed(1) ?? "N/A"}
-                  /100
-                </p>
-                <p className="text-xs text-white/75 leading-relaxed">
-                  {breakdown?.competition_analysis.summary ??
-                    "Competition analysis is not available for this scenario."}
-                </p>
-                <div className="space-y-2 mt-4">
-                  {(breakdown?.competition_analysis.signals ?? [])
-                    .slice(0, 2)
-                    .map((signal) => (
-                      <p
-                        key={signal}
-                        className="text-[11px] text-white/60 border-l border-accent/40 pl-2"
-                      >
-                        {signal}
-                      </p>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="scada-panel border-white/5 bg-background/50">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs lcd-text text-muted-foreground">
-                    Lease Cost Analysis
-                  </p>
-                  <Badge
-                    variant="outline"
-                    className="text-white/80 border-white/20 uppercase"
-                  >
-                    {breakdown?.lease_cost_analysis.level ?? "N/A"}
-                  </Badge>
-                </div>
-                <p className="text-3xl font-mono text-white mb-2">
-                  {formatCurrency(
-                    breakdown?.lease_cost_analysis.metrics
-                      .monthly_lease_cost_estimate,
-                  )}
-                </p>
-                <p className="text-xs text-white/75 leading-relaxed">
-                  {breakdown?.lease_cost_analysis.summary ??
-                    "Lease cost analysis is not available for this scenario."}
-                </p>
-                <div className="space-y-2 mt-4">
-                  {(breakdown?.lease_cost_analysis.signals ?? [])
-                    .slice(0, 2)
-                    .map((signal) => (
-                      <p
-                        key={signal}
-                        className="text-[11px] text-white/60 border-l border-white/30 pl-2"
-                      >
-                        {signal}
-                      </p>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="scada-panel border-white/5 bg-background/50 md:col-span-2">
-              <CardContent className="p-5">
-                <p className="text-xs lcd-text text-muted-foreground mb-2">
-                  Prediction Explanation
-                </p>
-                <div className="space-y-3 text-sm text-white/80">
-                  <p>
-                    {explanation?.revenue_explanation ??
-                      "Revenue explanation is not available for this scenario."}
-                  </p>
-                  <p>
-                    {explanation?.risk_explanation ??
-                      "Risk explanation is not available for this scenario."}
-                  </p>
-                  <p>
-                    {explanation?.feasibility_explanation ??
-                      "Prototype Prototype feasibility explanation is not available for this scenario."}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="scada-panel border-white/5 bg-background/50">
-              <CardContent className="p-5">
-                <p className="text-xs lcd-text text-muted-foreground mb-3">
-                  Main Drivers
-                </p>
-
-                <p className="text-[10px] text-emerald-400 uppercase tracking-widest mb-2">
-                  Positive Factors
-                </p>
-                <div className="space-y-2 mb-4">
-                  {(explanation?.top_positive_factors ?? []).map((factor) => (
-                    <p
-                      key={factor}
-                      className="text-xs text-white/75 border-l border-emerald-400/40 pl-2"
-                    >
-                      {factor}
-                    </p>
-                  ))}
-                </div>
-
-                <p className="text-[10px] text-destructive uppercase tracking-widest mb-2">
-                  Negative Factors
-                </p>
-                <div className="space-y-2">
-                  {(explanation?.top_negative_factors ?? []).map((factor) => (
-                    <p
-                      key={factor}
-                      className="text-xs text-white/75 border-l border-destructive/40 pl-2"
-                    >
-                      {factor}
-                    </p>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="scada-panel border-white/5 bg-background/50">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <Info className="w-4 h-4 text-primary" />
-                  <p className="text-xs lcd-text text-muted-foreground">
-                    What is real vs estimated?
-                  </p>
-                </div>
-                <p className="text-[10px] text-emerald-400 uppercase tracking-widest mb-2">
-                  Observed / Census-backed Inputs
-                </p>
-                <div className="space-y-2 mb-4">
-                  {(credibility?.observed_inputs ?? []).slice(0, 4).map((item) => (
-                    <div key={item.field_name} className="rounded border border-white/10 bg-white/[0.03] p-2">
-                      <p className="text-xs font-mono text-white">{item.label}</p>
-                      <p className="text-[10px] text-white/50">{item.user_note}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="text-[10px] text-primary uppercase tracking-widest mb-2">
-                  Model-predicted Outputs
-                </p>
-                <div className="space-y-2">
-                  {(credibility?.model_predicted_outputs ?? []).slice(0, 3).map((item) => (
-                    <div key={item.field_name} className="rounded border border-white/10 bg-white/[0.03] p-2">
-                      <p className="text-xs font-mono text-white">{item.label}</p>
-                      <p className="text-[10px] text-white/50">{item.user_note}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="scada-panel border-white/5 bg-background/50">
-              <CardContent className="p-5">
-                <p className="text-xs lcd-text text-muted-foreground mb-3">
-                  Proxy Values Still Needing Real Data
-                </p>
-                <div className="space-y-2 mb-4">
-                  {(credibility?.proxy_estimated_inputs ?? []).slice(0, 4).map((item) => (
-                    <div key={item.field_name} className="rounded border border-accent/20 bg-accent/[0.03] p-2">
-                      <p className="text-xs font-mono text-accent">{item.label}</p>
-                      <p className="text-[10px] text-white/50">{item.user_note}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">
-                  Next data needed
-                </p>
-                <div className="space-y-2">
-                  {(credibility?.next_data_needed ?? []).slice(0, 4).map((item) => (
-                    <p key={item} className="text-[11px] text-white/65 border-l border-destructive/40 pl-2">
-                      {item}
-                    </p>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
+      </div>
+
+      {/* --- FLOATING AI CHATBOT SYSTEM --- */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+        <AnimatePresence>
+          {isChatOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 30, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="w-[90vw] sm:w-[420px] shadow-2xl rounded-2xl overflow-hidden border border-white/10 bg-slate-950/95 backdrop-blur-xl"
+            >
+              <div className="bg-primary/20 p-3 flex justify-between items-center border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <BrainCircuit className="w-5 h-5 text-primary" />
+                  <span className="font-display text-xs text-white font-bold tracking-wider">Zonalyze AI Assistant</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsChatOpen(false)}
+                  className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-white transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="max-h-[500px] overflow-y-auto p-2">
+                <ScenarioAIChat
+                  municipalityName={municipalityName}
+                  businessSubcategory={businessSubcategory}
+                  radiusKm={radius[0]}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Floating circular toggle button */}
+        <button
+          type="button"
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
+            isChatOpen
+              ? "bg-destructive text-white hover:bg-destructive/90"
+              : "bg-primary text-white hover:bg-primary/95 shadow-primary/20 hover:scale-105"
+          }`}
+          title="Toggle Assistant"
+        >
+          {isChatOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6 animate-pulse" />}
+        </button>
       </div>
     </div>
   );
