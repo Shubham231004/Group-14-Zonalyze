@@ -67,8 +67,14 @@ def get_model_status() -> ModelStatusResponse:
         feasibility_rmse=None,
         feasibility_r2=metadata.get("feasibility_r2"),
         model_files=file_status,
-        important_note=metadata.get(
-            "important_note",
-            "Models are trained on simulation-generated proxy labels. Use them for scenario comparison only until real commercial outcome data is integrated.",
+        important_note=(
+            "Model files are missing or incomplete. Run "
+            "`python -m app.ml.train_models --rows 50000 --force-regenerate` from the "
+            "backend folder to build them locally (the .pkl files are gitignored)."
+            if not all_files_ready
+            else metadata.get(
+                "important_note",
+                "Models are trained on simulation-generated proxy labels. Use them for scenario comparison only until real commercial outcome data is integrated.",
+            )
         ),
     )

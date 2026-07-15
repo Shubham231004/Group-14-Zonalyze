@@ -19,6 +19,31 @@ FEATURE_COLUMNS_PATH = MODELS_DIR / "feature_columns.json"
 
 _predictor_instance = None
 
+RETRAIN_HINT = (
+    "Run: python -m app.ml.train_models --rows 50000 --force-regenerate "
+    "(from the backend folder) to build the model files locally."
+)
+
+
+class ModelsUnavailableError(RuntimeError):
+    """Raised when trained model artifacts are missing or unreadable.
+
+    This is handled centrally (see app/main.py) so the API returns a clear
+    503 "models unavailable — retrain" message instead of a raw 500 stack trace.
+    """
+
+
+def models_available() -> tuple[bool, List[str]]:
+    """Report whether all required model artifacts exist, without loading them."""
+    required = {
+        "risk_classifier.pkl": RISK_MODEL_PATH,
+        "revenue_regressor.pkl": REVENUE_MODEL_PATH,
+        "feasibility_regressor.pkl": FEASIBILITY_MODEL_PATH,
+        "feature_columns.json": FEATURE_COLUMNS_PATH,
+    }
+    missing = [name for name, path in required.items() if not path.exists()]
+    return (len(missing) == 0, missing)
+
 
 class ZonalyzePredictor:
     def __init__(self) -> None:
@@ -54,9 +79,8 @@ class ZonalyzePredictor:
         if isinstance(columns, list):
             return columns
 
-        raise FileNotFoundError(
-            f"Missing feature columns file: {FEATURE_COLUMNS_PATH}. "
-            "Run python -m app.ml.train_models."
+        raise ModelsUnavailableError(
+            f"Missing feature columns file: {FEATURE_COLUMNS_PATH}. {RETRAIN_HINT}"
         )
 
     def _load_categorical_columns(self) -> List[str]:
@@ -73,12 +97,15 @@ class ZonalyzePredictor:
 
     def _load_model(self, path: Path, label: str):
         if not path.exists():
-            raise FileNotFoundError(
-                f"Missing {label} model file: {path}. "
-                "Run python -m app.ml.train_models or copy backend/app/ml/models "
-                "from the machine that trained the models."
+            raise ModelsUnavailableError(
+                f"Missing {label} model file: {path}. {RETRAIN_HINT}"
             )
-        return joblib.load(path)
+        try:
+            return joblib.load(path)
+        except Exception as exc:  # corrupted / incompatible artifact
+            raise ModelsUnavailableError(
+                f"Could not load {label} model file: {path} ({type(exc).__name__}: {exc}). {RETRAIN_HINT}"
+            ) from exc
 
     def _clean_categorical_value(self, value: Any) -> str:
         if value is None:

@@ -11,9 +11,6 @@ from app.schemas.location_comparison import (
     LocationComparisonResponse,
 )
 from app.services.catalog_service import get_municipalities
-from app.services.competition_data_service import apply_competition_observation_to_features
-from app.services.demand_data_service import apply_demand_evidence_to_features
-from app.services.lease_cost_data_service import apply_lease_cost_evidence_to_features
 from app.services.prediction_consistency_service import apply_prediction_consistency_guard
 
 
@@ -167,21 +164,12 @@ def compare_locations(request: LocationComparisonRequest) -> LocationComparisonR
                     radius_km=radius_km,
                 )
                 features["municipality_name"] = municipality_name
-                features = apply_competition_observation_to_features(features)
-                features = apply_lease_cost_evidence_to_features(
-                    features=features,
-                    municipality_name=municipality_name,
-                    business_subcategory=request.business_subcategory,
-                    radius_km=radius_km,
-                )
-                features = apply_demand_evidence_to_features(
-                    features=features,
-                    municipality_name=municipality_name,
-                    business_subcategory=request.business_subcategory,
-                    radius_km=radius_km,
-                )
+                # Predict on the clean, training-consistent feature row; evidence
+                # is not applied to model inputs here.
                 raw_prediction = predictor.predict(features)
-                prediction = apply_prediction_consistency_guard(raw_prediction, features)
+                prediction = apply_prediction_consistency_guard(
+                    prediction_result=raw_prediction, features=features
+                )
 
                 strengths, concerns = _strengths_and_concerns(features, prediction)
                 score = _decision_score(features, prediction)

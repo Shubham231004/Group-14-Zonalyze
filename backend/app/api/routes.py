@@ -44,9 +44,9 @@ from app.services.feature_alignment_service import run_feature_alignment
 from app.ml.scenario_feature_builder import build_prediction_features
 from app.ml.predictor import get_predictor
 from app.services.credibility_service import build_prediction_credibility
-from app.services.competition_data_service import apply_competition_observation_to_features, get_competition_observation, list_competition_observations
-from app.services.lease_cost_data_service import apply_lease_cost_evidence_to_features, get_lease_cost_evidence, list_lease_cost_observations
-from app.services.demand_data_service import apply_demand_evidence_to_features, get_demand_evidence, list_demand_observations
+from app.services.competition_data_service import get_competition_observation, list_competition_observations
+from app.services.lease_cost_data_service import get_lease_cost_evidence, list_lease_cost_observations
+from app.services.demand_data_service import get_demand_evidence, list_demand_observations
 from app.services.recommendation_service import build_recommendation_decision
 
 from app.services.scenario_history_service import (
@@ -139,19 +139,8 @@ def prediction_credibility_route(request: AnalyzeScenarioRequest):
         radius_km=request.radius_km,
     )
     features["municipality_name"] = request.municipality_name
-    features = apply_competition_observation_to_features(features)
-    features = apply_lease_cost_evidence_to_features(
-        features=features,
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-    )
-    features = apply_demand_evidence_to_features(
-        features=features,
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-    )
+    # Evidence overrides are display-only; the model scores the clean, training-
+    # consistent feature row built by the shared pipeline.
     prediction_result = get_predictor().predict(features)
     return build_prediction_credibility(
         features=features,
@@ -178,30 +167,19 @@ def recommendation_decision_route(request: AnalyzeScenarioRequest):
         radius_km=request.radius_km,
     )
     features["municipality_name"] = request.municipality_name
-    features = apply_competition_observation_to_features(features)
+    # Evidence is display/decision context only; the model scores the clean,
+    # training-consistent feature row (evidence must not mutate model inputs).
     competition_evidence = get_competition_observation(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
         population=float(features.get("population_2021", 0) or 0),
     )
-    features = apply_lease_cost_evidence_to_features(
-        features=features,
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-    )
     lease_cost_evidence = get_lease_cost_evidence(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
         features=features,
-    )
-    features = apply_demand_evidence_to_features(
-        features=features,
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
     )
     demand_evidence = get_demand_evidence(
         municipality_name=request.municipality_name,
@@ -308,13 +286,6 @@ def demand_evidence_route(request: AnalyzeScenarioRequest):
         radius_km=request.radius_km,
     )
     features["municipality_name"] = request.municipality_name
-    features = apply_competition_observation_to_features(features)
-    features = apply_lease_cost_evidence_to_features(
-        features=features,
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-    )
     return get_demand_evidence(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,

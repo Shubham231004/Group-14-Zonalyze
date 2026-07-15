@@ -22,9 +22,6 @@ from app.schemas.feature_alignment import (
     FeatureAlignmentResponse,
 )
 from app.schemas.scenario import AnalyzeScenarioRequest
-from app.services.competition_data_service import apply_competition_observation_to_features
-from app.services.demand_data_service import apply_demand_evidence_to_features
-from app.services.lease_cost_data_service import apply_lease_cost_evidence_to_features
 
 
 DEFAULT_MUNICIPALITY = "Kitchener"
@@ -33,30 +30,18 @@ DEFAULT_RADIUS_KM = 5
 
 
 def _build_runtime_features(request: AnalyzeScenarioRequest) -> Dict[str, Any]:
-    """Build the same feature row used by dashboard prediction."""
+    """Build the same feature row used by dashboard prediction.
+
+    This mirrors dashboard_service.analyze_scenario: the model is scored on the
+    clean, training-consistent feature row from the shared pipeline. Evidence
+    services are display-only and are intentionally not applied here.
+    """
     features = build_prediction_features(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
     )
     features["municipality_name"] = request.municipality_name
-
-    features = apply_competition_observation_to_features(features)
-
-    features = apply_lease_cost_evidence_to_features(
-        features=features,
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-    )
-
-    features = apply_demand_evidence_to_features(
-        features=features,
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-    )
-
     return features
 
 
