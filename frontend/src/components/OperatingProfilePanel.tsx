@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   generateOperatingProfile,
   type OperatingProfileResponse,
@@ -84,6 +84,34 @@ export default function OperatingProfilePanel({
       setLoading(false);
     }
   }
+
+  // Auto-fetch the operating profile when the scenario changes, on its own
+  // (non-blocking) schedule so it never delays the main dashboard. Debounced,
+  // and guarded so the same scenario is not re-fetched (the backend also caches).
+  const scenarioKey = useMemo(
+    () =>
+      JSON.stringify({
+        municipalityName,
+        radiusKm,
+        businessSubcategory: businessSubcategory ?? null,
+        businessQuery: businessQuery ?? null,
+        customBusinessMapActive,
+      }),
+    [municipalityName, radiusKm, businessSubcategory, businessQuery, customBusinessMapActive],
+  );
+  const lastFetchedKeyRef = useRef<string | null>(null);
+  const handleGenerateRef = useRef(handleGenerate);
+  handleGenerateRef.current = handleGenerate;
+
+  useEffect(() => {
+    if (!canGenerate) return;
+    if (lastFetchedKeyRef.current === scenarioKey) return;
+    const timer = window.setTimeout(() => {
+      lastFetchedKeyRef.current = scenarioKey;
+      void handleGenerateRef.current();
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [scenarioKey, canGenerate]);
 
   return (
     <section className="rounded-2xl border border-slate-700/70 bg-slate-950/70 p-5 shadow-xl">
