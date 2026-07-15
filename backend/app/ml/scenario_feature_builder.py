@@ -6,6 +6,12 @@ import numpy as np
 import pandas as pd
 
 from app.catalogs.business_subcategories import list_business_subcategory_profiles
+from app.ml.feature_pipeline import (
+    TARGET_COLUMNS,
+    build_scenario_record,
+    municipality_signals_from_census_row,
+    normalize_business_profile,
+)
 
 
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -374,82 +380,64 @@ def build_prediction_features(
     business_subcategory: str,
     radius_km: float,
 ) -> Dict[str, Any]:
+    """Build the deterministic feature row for a single scenario.
+
+    This delegates all model-feature math to the shared pipeline
+    (app.ml.feature_pipeline.build_scenario_record) so runtime inputs match the
+    training data exactly. On top of the model feature columns it adds census
+    passthrough fields and legacy aliases that the evidence/analysis services
+    still read, so nothing downstream breaks.
+    """
     city = get_city_row(municipality_name)
     profile = get_business_profile(business_subcategory)
 
-    competition = estimate_competition(city, profile, radius_km)
-    demo_fit = demographic_fit_score(city, profile)
-    demand = demand_score(city, profile, competition["competition_score_0_100"])
+    muni = municipality_signals_from_census_row(city)
+    biz = normalize_business_profile(profile.to_dict())
 
-    reachable_population = safe_num(city, "population_2021", 0) * radius_population_factor(radius_km)
+    record = build_scenario_record(muni, biz, radius_km, rng=None)
 
-    avg_ticket = float(profile["avg_ticket"])
-    gross_margin_pct = float(profile["gross_margin_pct"]) * 100
-
-    monthly_lease = estimate_lease_cost(city, profile, radius_km)
-    monthly_staff = float(profile["monthly_staff_cost"])
-    monthly_utilities = float(profile["monthly_utilities"])
-
-    base_capture_rate = float(profile["base_capture_rate"])
-
-    capture_multiplier = clamp(0.72 + (demand / 115), 0.35, 1.70)
-    competition_penalty = 1 - (competition["competition_score_0_100"] / 100) * 0.24
-    demand_multiplier = clamp(capture_multiplier * competition_penalty, 0.22, 1.80)
-
-    expected_customers_per_day = max(
-        1,
-        reachable_population * base_capture_rate * demand_multiplier,
-    )
-
-    monthly_gross_revenue = expected_customers_per_day * avg_ticket * 30
-    monthly_marketing = max(600, monthly_gross_revenue * 0.03)
-
-    monthly_operating_cost = (
-        monthly_lease + monthly_staff + monthly_utilities + monthly_marketing + 1800
-    )
-
-    feature_row = {
-        "municipality_type": city.get("municipality_type"),
-        "business_category": profile["category"],
-        "business_subcategory": profile["subcategory"],
-
-        "radius_km": radius_km,
-
-        "population_2021": safe_num(city, "population_2021"),
-        "population_density_per_km2": safe_num(city, "population_density_per_km2"),
-        "population_growth_2016_2021_pct": safe_num(city, "population_growth_2016_2021_pct"),
-        "household_median_total_income_2020": safe_num(city, "household_median_total_income_2020"),
-        "children_0_14_pct": safe_num(city, "children_0_14_pct"),
-        "youth_15_24_pct": safe_num(city, "youth_15_24_pct"),
-        "young_adult_20_34_pct": safe_num(city, "young_adult_20_34_pct"),
-        "working_age_25_64_pct": safe_num(city, "working_age_25_64_pct"),
-        "seniors_65_plus_pct": safe_num(city, "seniors_65_plus_pct"),
-        "family_with_children_pct": safe_num(city, "family_with_children_pct"),
-        "employment_rate_pct": safe_num(city, "employment_rate_pct"),
-        "unemployment_rate_pct": safe_num(city, "unemployment_rate_pct"),
-        "immigrant_pct": safe_num(city, "immigrant_pct"),
-        "visible_minority_pct": safe_num(city, "visible_minority_pct"),
-        "diversity_index_0_100": safe_num(city, "diversity_index_0_100"),
-        "renter_pct": safe_num(city, "renter_pct"),
-        "renter_average_monthly_shelter_cost": safe_num(city, "renter_average_monthly_shelter_cost"),
-        "rent_pressure_index_0_100": safe_num(city, "rent_pressure_index_0_100"),
-        "market_base_index_0_100": safe_num(city, "market_base_index_0_100"),
-
-        "average_ticket_size": avg_ticket,
-        "base_capture_rate": base_capture_rate,
-        "gross_margin_pct": gross_margin_pct,
-        "estimated_space_sqft": float(profile["space_sqft"]),
-        "reachable_population_estimate": round(reachable_population, 2),
-        "demographic_fit_score_0_100": demo_fit,
-        "demand_score_0_100": demand,
-        "competitor_count_estimate": competition["competitor_count_estimate"],
-        "competitor_density_per_10k": competition["competitor_density_per_10k"],
-        "competition_score_0_100": competition["competition_score_0_100"],
-        "monthly_lease_cost_estimate": monthly_lease,
-        "monthly_staff_cost_estimate": monthly_staff,
-        "monthly_utilities_cost_estimate": monthly_utilities,
-        "monthly_marketing_cost_estimate": round(monthly_marketing, 2),
-        "monthly_operating_cost_estimate": round(monthly_operating_cost, 2),
+    # Model features + display cost components; drop simulation target labels.
+    features: Dict[str, Any] = {
+        key: value for key, value in record.items() if key not in set(TARGET_COLUMNS)
     }
 
-    return add_model_schema_aliases(feature_row)
+    # Census passthroughs (real values) and legacy aliases consumed by the
+    # competition / demand / lease / credibility / explanation services.
+    features.update(
+        {
+            "municipality_type": city.get("municipality_type"),
+            "business_category": profile["category"],
+            "municipality": muni.municipality_name,
+            # census passthroughs
+            "population_density_per_km2": muni.population_density,
+            "household_median_total_income_2020": muni.median_income,
+            "average_age": muni.median_age,
+            "employment_rate_pct": muni.employment_rate,
+            "diversity_index_0_100": muni.diversity_index,
+            "youth_15_24_pct": muni.students_pct,
+            "family_with_children_pct": muni.families_pct,
+            "seniors_65_plus_pct": muni.retirees_pct,
+            "income_index_0_100": muni.income_index,
+            "density_index_0_100": muni.density_index,
+            "market_base_index_0_100": muni.market_base_index,
+            "rent_pressure_index_0_100": safe_num(city, "rent_pressure_index_0_100", 50.0),
+            "renter_average_monthly_shelter_cost": safe_num(city, "renter_average_monthly_shelter_cost", 0.0),
+            "base_capture_rate": biz.base_capture_rate,
+            "gross_margin_pct": float(profile.get("gross_margin_pct", 0.4)) * 100,
+            # aliases for legacy field names
+            "demographic_fit_score_0_100": record["demographic_fit_score"],
+            "business_type_demographic_fit": record["demographic_fit_score"],
+            "competitor_count_estimate": record["competitor_count_same_type"],
+            "foot_traffic_proxy": record["foot_traffic_proxy_index"],
+            "transit_access_score": record["transit_access_proxy_index"],
+            "monthly_lease_cost_estimate": record["median_monthly_lease_cost"],
+            "estimated_monthly_lease_cost": record["median_monthly_lease_cost"],
+            "lease_cost_low_estimate": record["low_monthly_lease_cost"],
+            "lease_cost_high_estimate": record["high_monthly_lease_cost"],
+            "monthly_utilities_marketing_cost_estimate": round(
+                record["monthly_utilities_cost_estimate"] + record["monthly_marketing_cost_estimate"], 2
+            ),
+        }
+    )
+
+    return features
