@@ -17,6 +17,12 @@ type AIStatusResponse = {
   default_model?: string;
   defaultModel?: string;
   message?: string;
+  // AI health details
+  ollama_version?: string | null;
+  model_installed?: boolean;
+  structured_outputs?: boolean;
+  structured_outputs_note?: string | null;
+  warnings?: string[];
 };
 
 type ScenarioChatResponse = {
@@ -148,10 +154,17 @@ export default function ScenarioAIChat({
   const isReady = aiStatus?.status === "ready";
   const statusLabel = isCheckingStatus
     ? "checking"
-    : aiStatus?.status || "unknown";
+    : aiStatus?.status === "model_missing"
+      ? "model missing"
+      : aiStatus?.status || "unknown";
   const modelLabel = aiStatus?.default_model || aiStatus?.defaultModel || answer?.model || "local model";
   const usedSignals = normalizeSignals(answer);
   const limitations = normalizeLimitations(answer);
+
+  // AI health: structured outputs are what keep local-model JSON reliable.
+  const structuredOutputs = aiStatus?.structured_outputs === true;
+  const ollamaVersion = aiStatus?.ollama_version || null;
+  const healthWarnings = aiStatus?.warnings ?? [];
 
   return (
     <Card className="scada-panel border-white/5 overflow-hidden">
@@ -181,11 +194,42 @@ export default function ScenarioAIChat({
             <Badge variant="outline" className="border-white/15 text-white/60">
               {modelLabel}
             </Badge>
+            {ollamaVersion && (
+              <Badge variant="outline" className="border-white/15 text-white/60">
+                Ollama {ollamaVersion}
+              </Badge>
+            )}
+            {aiStatus && !isCheckingStatus && (
+              <Badge
+                variant="outline"
+                title={aiStatus.structured_outputs_note ?? undefined}
+                className={
+                  structuredOutputs
+                    ? "border-emerald-400/30 text-emerald-300"
+                    : "border-accent/30 text-accent"
+                }
+              >
+                {structuredOutputs ? "Structured JSON on" : "Structured JSON off"}
+              </Badge>
+            )}
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4 p-5">
+        {healthWarnings.length > 0 && (
+          <div className="rounded-xl border border-accent/30 bg-accent/10 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-accent">
+              <AlertTriangle className="h-4 w-4" />
+              AI health
+            </div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-accent/90">
+              {healthWarnings.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {SUGGESTED_QUESTIONS.map((item) => (
             <Button

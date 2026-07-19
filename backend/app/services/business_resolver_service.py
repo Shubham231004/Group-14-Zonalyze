@@ -13,7 +13,7 @@ from app.schemas.business_resolver import (
     BusinessResolveResponse,
     OSMTagSuggestion,
 )
-from app.services.local_ai_service import generate_with_ollama
+from app.services.local_ai_service import generate_json_with_ollama
 from app.services.business_resolution_cache_service import (
     get_cached_business_resolution,
     save_business_resolution_cache,
@@ -40,6 +40,37 @@ TAGINFO_BASE_URL = os.getenv("OSM_TAGINFO_BASE_URL", "https://taginfo.openstreet
 OSM_KEY_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_:.-]{0,63}$")
 OSM_VALUE_RE = re.compile(r"^[^\n\r\t]{1,120}$")
 VALID_TAG_ROLES = {"primary", "secondary", "brand", "attribute", "name", "operator", "specialty", "other"}
+
+# JSON schema for Ollama structured outputs — forces clean, well-typed resolver
+# output (categories + search terms + candidate OSM tags) even on small models.
+BUSINESS_RESOLVER_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "normalized_business_name": {"type": "string"},
+        "primary_category": {"type": "string"},
+        "secondary_categories": {"type": "array", "items": {"type": "string"}},
+        "brand_terms": {"type": "array", "items": {"type": "string"}},
+        "specialty_terms": {"type": "array", "items": {"type": "string"}},
+        "search_terms": {"type": "array", "items": {"type": "string"}},
+        "osm_tags": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string"},
+                    "value": {"type": "string"},
+                    "confidence": {"type": "number"},
+                    "tag_role": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+                "required": ["key", "value"],
+            },
+        },
+        "confidence_score": {"type": "number"},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["normalized_business_name", "primary_category", "search_terms"],
+}
 
 # Generic POI category keys only. This is not a business mapping; it only says
 # which OSM keys are structurally useful as searchable POI/business categories.
@@ -575,7 +606,12 @@ def resolve_business_query(request: BusinessResolveRequest) -> BusinessResolveRe
         return cached_response
 
     prompt = _build_business_resolution_prompt(business_query)
-    ai_result = generate_with_ollama(prompt=prompt, model=request.model, timeout_seconds=90)
+    ai_result = generate_json_with_ollama(
+        prompt=prompt,
+        model=request.model,
+        timeout_seconds=90,
+        json_schema=BUSINESS_RESOLVER_JSON_SCHEMA,
+    )
 
     if not ai_result.available:
         return _needs_review_response(

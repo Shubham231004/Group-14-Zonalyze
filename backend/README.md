@@ -47,6 +47,44 @@ and `/ml/feature-alignment` will flag the drift.
 If the model files are missing, prediction endpoints return HTTP 503 with a
 `models_unavailable` message and the retrain command (they no longer crash).
 
+## Improving AI response quality (Ollama)
+
+The operating profile, scenario chat, and business resolver use a local Ollama
+model. Two things make the biggest difference:
+
+**1. Use a stronger model.** `llama3.2:3b` is small and unreliable at structured
+business reasoning. A 7B instruct model is dramatically better at JSON and
+instruction-following. Recommended (pull one, then point `OLLAMA_MODEL` at it):
+
+```bash
+ollama pull qwen2.5:7b-instruct     # best quality/size balance (recommended)
+# or, if RAM-constrained:
+ollama pull qwen2.5:3b-instruct     # much better than llama3.2:3b at similar size
+```
+
+```
+OLLAMA_MODEL=qwen2.5:7b-instruct
+```
+
+**2. Structured outputs are enabled.** The JSON endpoints (operating profile,
+business resolver) send a JSON **schema** to Ollama, which forces valid,
+correctly-typed output (e.g. every operating-profile section must have numeric
+low/median/high). This requires **Ollama ≥ 0.5** (`ollama --version`; upgrade if
+older). If your Ollama is older and rejects schema output, disable it with
+`OLLAMA_JSON_SCHEMA=0` (it falls back to plain JSON mode).
+
+Tuning knobs (all optional, sensible defaults):
+
+```
+OLLAMA_MODEL=qwen2.5:7b-instruct   # the model to use
+OLLAMA_JSON_SCHEMA=1               # 1=schema-constrained JSON (default), 0=plain json
+OLLAMA_NUM_CTX=8192                # chat context window
+OLLAMA_JSON_NUM_CTX=8192           # JSON context window
+OLLAMA_NUM_PREDICT=700             # chat max output tokens
+OLLAMA_JSON_NUM_PREDICT=2200       # JSON max output tokens
+OLLAMA_TEMPERATURE=0.2             # chat temperature (JSON stays at 0.0)
+```
+
 ## Run
 
 ```bash

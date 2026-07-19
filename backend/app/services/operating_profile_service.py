@@ -49,6 +49,55 @@ SECTION_KEYS = {
 }
 
 
+# JSON schema passed to Ollama structured outputs. It forces the model to emit
+# exactly 5 sections, each with a numeric low/median/high range — which is what
+# fixes the previous "missing / $0 range" failures on small local models.
+_SECTION_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "key": {"type": "string"},
+        "title": {"type": "string"},
+        "status": {"type": "string"},
+        "estimate_type": {"type": "string"},
+        "confidence": {"type": "string"},
+        "range": {
+            "type": "object",
+            "properties": {
+                "low": {"type": "number"},
+                "median": {"type": "number"},
+                "high": {"type": "number"},
+                "unit": {"type": "string"},
+                "display_value": {"type": "string"},
+            },
+            "required": ["low", "median", "high", "unit"],
+        },
+        "summary": {"type": "string"},
+        "reasoning": {"type": "array", "items": {"type": "string"}},
+        "evidence_used": {"type": "array", "items": {"type": "string"}},
+        "limitations": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["key", "range", "summary"],
+}
+
+OPERATING_PROFILE_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "status": {"type": "string"},
+        "overall_confidence": {"type": "string"},
+        "user_facing_note": {"type": "string"},
+        "sections": {
+            "type": "array",
+            "items": _SECTION_JSON_SCHEMA,
+            "minItems": 5,
+            "maxItems": 5,
+        },
+        "warnings": {"type": "array", "items": {"type": "string"}},
+        "next_data_needed": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["sections"],
+}
+
+
 def _normalize_text(value: Any, max_length: int = 220) -> str:
     text = str(value or "").strip()
     text = re.sub(r"\s+", " ", text)
@@ -563,6 +612,7 @@ Invalid previous response:
         model=model,
         timeout_seconds=180,
         num_predict=2200,
+        json_schema=OPERATING_PROFILE_JSON_SCHEMA,
     )
     if not retried.available:
         return None
@@ -633,6 +683,7 @@ Broken response:
         model=model,
         timeout_seconds=120,
         num_predict=1800,
+        json_schema=OPERATING_PROFILE_JSON_SCHEMA,
     )
     if not repaired.available:
         return None
@@ -671,6 +722,7 @@ def build_operating_profile(request: OperatingProfileRequest) -> OperatingProfil
         model=clean_request.model,
         timeout_seconds=180,
         num_predict=1800,
+        json_schema=OPERATING_PROFILE_JSON_SCHEMA,
     )
 
     # Backward compatibility for older Ollama installs/models that may not support

@@ -39,9 +39,26 @@ class ScenarioChatResponse(BaseModel):
 
 
 class LocalAIStatusResponse(BaseModel):
-    status: str
+    status: str = Field(
+        ...,
+        description="ready | model_missing | unavailable",
+    )
     provider: str = "ollama"
     base_url: str
     default_model: str
     available_models: List[str] = Field(default_factory=list)
     message: str
+
+    # AI health details: what actually drives local response quality.
+    ollama_version: Optional[str] = Field(
+        default=None, description="Running Ollama version, or null if unreachable."
+    )
+    model_installed: bool = Field(
+        default=False, description="Whether the configured default_model is pulled."
+    )
+    structured_outputs: bool = Field(
+        default=False,
+        description="Whether schema-constrained JSON is active (needs Ollama >= 0.5).",
+    )
+    structured_outputs_note: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
