@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -114,6 +115,60 @@ def get_competition_observation(
         chain_share_pct=round(_safe_float(row.get("chain_share_pct")), 2),
         competition_pressure_index=pressure,
         data_quality_note=str(row.get("data_quality_note")),
+    )
+
+
+def build_osm_competition_evidence(
+    municipality_name: str,
+    business_subcategory: str,
+    population: float,
+    osm_elements: List[Dict[str, Any]],
+    is_live: bool,
+) -> Optional[CompetitionObservationEvidence]:
+    """Build competition evidence from REAL OpenStreetMap competitor POIs.
+
+    This is the real-data path for the competition signal. `osm_elements` are the
+    relevance-filtered competitor POIs returned by osm_service (each carries a
+    `distance_km`). It is display/decision evidence only — it must NOT be fed into
+    the ML feature vector (the model is trained on the simulation scale).
+
+    Returns None when OSM was not live, so callers can fall back to the catalog
+    seed or the formula proxy.
+    """
+    if not is_live:
+        return None
+
+    observed_count = len(osm_elements)
+    density_per_10k = observed_count / max(1.0, population / 10000.0) if population > 0 else 0.0
+
+    distances = [
+        _safe_float(item.get("distance_km"), 0.0)
+        for item in osm_elements
+        if item.get("distance_km") is not None
+    ]
+    nearest = round(min(distances), 3) if distances else None
+
+    pressure = _competition_pressure_index(observed_count, density_per_10k, nearest)
+
+    return CompetitionObservationEvidence(
+        municipality_name=municipality_name,
+        business_subcategory=business_subcategory,
+        source_name="OpenStreetMap (Overpass API)",
+        source_method="Live count of matching businesses tagged in OpenStreetMap within the analysis radius",
+        source_date=date.today().isoformat(),
+        method="live_osm_competitor_scan",
+        credibility="medium",
+        observed_competitor_count=observed_count,
+        competitor_density_per_10k=round(density_per_10k, 3),
+        nearest_competitor_distance_km=nearest,
+        avg_competitor_rating=None,
+        chain_share_pct=None,
+        competition_pressure_index=pressure,
+        data_quality_note=(
+            "Real count of competitor businesses mapped in OpenStreetMap within the radius. "
+            "OSM coverage varies by area and some businesses may be unmapped, so treat this as a "
+            "strong but incomplete (lower-bound) observation, not a full census of the market."
+        ),
     )
 
 

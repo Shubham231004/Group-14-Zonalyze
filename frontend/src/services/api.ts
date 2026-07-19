@@ -272,6 +272,8 @@ export interface GeospatialMarketContext {
   rent_pressure_index: number;
   marker_count: number;
   real_competitor_count: number;
+  competition_evidence?: CompetitionObservationEvidence | null;
+  competition_evidence_source?: string;
   transit_marker_count: number;
   lease_marker_count: number;
   markers: MapMarker[];

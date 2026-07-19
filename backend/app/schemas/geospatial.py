@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.competition import CompetitionObservationEvidence
+
 
 class GeoCoordinate(BaseModel):
     latitude: float
@@ -123,6 +125,12 @@ class GeospatialMarketContext(BaseModel):
     rent_pressure_index: float
     marker_count: int
     real_competitor_count: int
+
+    # Real OpenStreetMap-backed competition evidence for this radius (display /
+    # decision only — never fed into the ML feature vector). Present when OSM was
+    # live; null when it fell back to proxy/seed.
+    competition_evidence: Optional[CompetitionObservationEvidence] = None
+    competition_evidence_source: str = "proxy"
     transit_marker_count: int
     lease_marker_count: int
     markers: List[MapMarker]

@@ -18,7 +18,10 @@ from app.schemas.geospatial import (
     MapMarker,
 )
 from app.schemas.scenario import AnalyzeScenarioRequest
-from app.services.competition_data_service import get_competition_observation
+from app.services.competition_data_service import (
+    build_osm_competition_evidence,
+    get_competition_observation,
+)
 from app.services.demand_data_service import get_demand_evidence
 from app.services.lease_cost_data_service import get_lease_cost_evidence
 from app.services.osm_service import (
@@ -410,6 +413,28 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
         max_requests=20,
     )
 
+    # Real-data competition: build sourced evidence from the OSM competitors the
+    # map already fetched (zero extra latency). Prefer this over the catalog seed /
+    # formula proxy. This is display/decision evidence only — the ML feature vector
+    # is untouched. Falls back to the seed observation when OSM is not live.
+    osm_population = _safe_float(features.get("population_2021"), 0.0)
+    osm_competition_evidence = build_osm_competition_evidence(
+        municipality_name=municipality_name,
+        business_subcategory=display_business_name,
+        population=osm_population,
+        osm_elements=competitor_pois,
+        is_live=(competitor_result.status == "live_osm"),
+    )
+    if osm_competition_evidence is not None:
+        authoritative_competition = osm_competition_evidence
+        competition_evidence_source = "openstreetmap_live"
+    else:
+        authoritative_competition = competition
+        seed_method = str(getattr(competition, "method", "") or "")
+        competition_evidence_source = (
+            "catalog_seed" if seed_method.startswith("data_catalog") else "proxy"
+        )
+
     markers: List[MapMarker] = []
 
     for index, poi in enumerate(competitor_pois[:35], start=1):
@@ -423,7 +448,7 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
                 longitude=round(float(poi["longitude"]), 6),
                 x_offset_pct=round(x_pct, 2),
                 y_offset_pct=round(y_pct, 2),
-                intensity=float(_safe_float(getattr(competition, "competition_pressure_index", None), 50.0)),
+                intensity=float(_safe_float(getattr(authoritative_competition, "competition_pressure_index", None), 50.0)),
                 source_method="OpenStreetMap Overpass API using dynamic AI-resolved tags" if dynamic_resolution else "OpenStreetMap Overpass API",
                 credibility="medium" if competitor_result.status == "live_osm" else "limited",
                 osm_id=poi.get("osm_id"),
@@ -483,7 +508,7 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
             "Zonalyze did not synthesize heatmap points."
         )
 
-    competition_index = _safe_float(getattr(competition, "competition_pressure_index", None), 0.0)
+    competition_index = _safe_float(getattr(authoritative_competition, "competition_pressure_index", None), 0.0)
     demand_index = _safe_float(getattr(demand, "demand_pressure_index", None), 0.0)
     rent_index = _safe_float(getattr(lease, "rent_pressure_index", None), 0.0)
 
@@ -538,6 +563,8 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
         rent_pressure_index=rent_index,
         marker_count=len(markers),
         real_competitor_count=len([m for m in markers if m.marker_type == "competitor"]),
+        competition_evidence=authoritative_competition,
+        competition_evidence_source=competition_evidence_source,
         transit_marker_count=len([m for m in markers if m.marker_type == "transit"]),
         lease_marker_count=0,
         markers=markers,

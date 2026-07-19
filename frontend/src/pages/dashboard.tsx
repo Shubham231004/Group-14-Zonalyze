@@ -289,7 +289,15 @@ export default function Dashboard() {
   const explanation = dashboardData?.prediction_explanation ?? null;
   const breakdown = dashboardData?.analysis_breakdown ?? null;
   const credibility = dashboardData?.prediction_credibility ?? null;
-  const competitionEvidence = dashboardData?.competition_evidence ?? null;
+  // Prefer real, live OpenStreetMap competition evidence (from the market map)
+  // over the catalog seed / formula proxy from the dashboard response.
+  const osmCompetitionEvidence =
+    (geoContext as any)?.competition_evidence_source === "openstreetmap_live"
+      ? (geoContext as any)?.competition_evidence ?? null
+      : null;
+  const competitionEvidence =
+    osmCompetitionEvidence ?? dashboardData?.competition_evidence ?? null;
+  const competitionIsLiveOsm = Boolean(osmCompetitionEvidence);
   const leaseCostEvidence = dashboardData?.lease_cost_evidence ?? null;
   const demandEvidence = dashboardData?.demand_evidence ?? null;
   const recommendationDecision = dashboardData?.recommendation_decision ?? null;
@@ -1357,11 +1365,24 @@ export default function Dashboard() {
                             <Database className="w-5 h-5 text-primary" />
                             <div>
                               <p className="text-[10px] text-muted-foreground uppercase font-mono">Competition Evidence</p>
-                              <p className="text-xs font-mono text-white/80">{competitionEvidence ? competitionEvidence.credibility : "Fallback Proxy"}</p>
+                              <p className="text-xs font-mono text-white/80">
+                                {competitionIsLiveOsm
+                                  ? (competitionEvidence?.source_name ?? "OpenStreetMap")
+                                  : competitionEvidence
+                                    ? competitionEvidence.credibility
+                                    : "Fallback Proxy"}
+                              </p>
                             </div>
                           </div>
-                          <Badge variant="outline" className="text-primary border-primary/30 uppercase font-mono text-[10px]">
-                            {competitionEvidence ? "Catalog" : "Proxy"}
+                          <Badge
+                            variant="outline"
+                            className={
+                              competitionIsLiveOsm
+                                ? "text-emerald-300 border-emerald-400/40 uppercase font-mono text-[10px]"
+                                : "text-primary border-primary/30 uppercase font-mono text-[10px]"
+                            }
+                          >
+                            {competitionIsLiveOsm ? "Live OSM" : competitionEvidence ? "Catalog" : "Proxy"}
                           </Badge>
                         </div>
                         
