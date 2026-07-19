@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     from pymongo import MongoClient
@@ -120,8 +123,10 @@ def get_mongo_client() -> Optional[MongoClient]:  # type: ignore[type-arg]
             uuidRepresentation="standard",
             appname="ZonalyzeCapstone",
         )
-    except Exception:
+    except Exception as exc:
         # Invalid URI, DNS SRV timeout, missing dnspython, blocked network, etc.
+        # Fail open (cache is optional) but log so the failure is not silent.
+        logger.warning("MongoDB client init failed, cache disabled: %s: %s", type(exc).__name__, exc)
         return None
 
 

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from app.core.mongo import get_mongo_collection
 from app.schemas.operating_profile import OperatingProfileResponse
+
+logger = logging.getLogger(__name__)
 
 
 CACHE_COLLECTION_NAME = os.getenv("OPERATING_PROFILE_CACHE_COLLECTION", "operating_profile_cache")
@@ -33,7 +36,8 @@ def _cache_key(*, municipality_name: str, radius_km: float, business_query: Opti
 def _collection():
     try:
         return get_mongo_collection(CACHE_COLLECTION_NAME)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Operating-profile cache collection unavailable: %s: %s", type(exc).__name__, exc)
         return None
 
 
@@ -82,7 +86,8 @@ def get_cached_operating_profile(
         response = OperatingProfileResponse(**payload)
         response.cache_status = "hit"
         return response
-    except Exception:
+    except Exception as exc:
+        logger.warning("Operating-profile cache read failed: %s: %s", type(exc).__name__, exc)
         return None
 
 
@@ -139,5 +144,6 @@ def save_operating_profile_cache(
             upsert=True,
         )
         return True
-    except Exception:
+    except Exception as exc:
+        logger.warning("Operating-profile cache write failed: %s: %s", type(exc).__name__, exc)
         return False
