@@ -53,6 +53,49 @@ def _timeout_ms(env_name: str, default: str) -> int:
         return int(default)
 
 
+def _configure_srv_dns_resolver(uri: str) -> None:
+    """Make `mongodb+srv://` URIs resolvable on restricted (college/VPN) networks.
+
+    Atlas SRV URIs require a DNS SRV/TXT lookup. Some campus/corporate DNS
+    servers silently drop or time out on SRV queries, which makes every cache
+    read/write raise and the cache silently no-op (cache_status stays
+    "miss_not_saved"). Atlas SRV records are public, so we point dnspython at a
+    public resolver (Google/Cloudflare by default) with the system nameservers
+    kept as a fallback.
+
+    Controlled by MONGODB_DNS_RESOLVERS (comma-separated IPs). Set it to an empty
+    string to disable and use only the system resolver. This never raises.
+    """
+    if not uri.startswith("mongodb+srv://"):
+        return
+
+    resolvers_raw = os.getenv("MONGODB_DNS_RESOLVERS", "8.8.8.8,1.1.1.1")
+    public_nameservers = [ip.strip() for ip in resolvers_raw.split(",") if ip.strip()]
+    if not public_nameservers:
+        return
+
+    try:
+        import dns.resolver  # provided by dnspython, a pymongo[srv] dependency
+
+        try:
+            system_nameservers = list(dns.resolver.Resolver(configure=True).nameservers)
+        except Exception:
+            system_nameservers = []
+
+        # Public resolvers first so SRV lookups succeed quickly, then fall back to
+        # system DNS for anything the public resolvers cannot answer.
+        ordered = public_nameservers + [ns for ns in system_nameservers if ns not in public_nameservers]
+
+        resolver = dns.resolver.Resolver(configure=False)
+        resolver.nameservers = ordered
+        resolver.timeout = _timeout_ms("MONGODB_SERVER_SELECTION_TIMEOUT_MS", "2500") / 1000.0
+        resolver.lifetime = resolver.timeout * max(1, len(ordered))
+        dns.resolver.default_resolver = resolver
+    except Exception:
+        # dnspython missing or misconfigured: leave the system resolver in place.
+        pass
+
+
 @lru_cache(maxsize=1)
 def get_mongo_client() -> Optional[MongoClient]:  # type: ignore[type-arg]
     """Return a MongoDB client, or None if MongoDB cannot be initialized.
@@ -66,6 +109,7 @@ def get_mongo_client() -> Optional[MongoClient]:  # type: ignore[type-arg]
         return None
 
     uri = _mongo_uri()
+    _configure_srv_dns_resolver(uri)
     try:
         return MongoClient(  # type: ignore[operator]
             uri,

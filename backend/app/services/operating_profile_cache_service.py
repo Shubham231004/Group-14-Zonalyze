@@ -62,6 +62,12 @@ def get_cached_operating_profile(
             return None
 
         expires_at = document.get("expires_at")
+        # MongoDB returns naive datetimes (UTC) unless the client is tz_aware.
+        # Treat a naive value as UTC so comparing it to a tz-aware "now" does not
+        # raise TypeError (which the outer except would swallow, silently forcing
+        # every lookup to miss even when a valid cache document exists).
+        if isinstance(expires_at, datetime) and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
         if isinstance(expires_at, datetime) and expires_at < _now_utc():
             try:
                 collection.delete_one({"_id": key})
@@ -90,7 +96,12 @@ def save_operating_profile_cache(
     response: OperatingProfileResponse,
 ) -> bool:
     try:
-        if response.status not in {"estimated", "partial_estimate"}:
+        # Cache any successful generation. A success can carry several status
+        # labels (estimated, evidence_supported, limited_estimate, ...), so use a
+        # denylist of failure states rather than a narrow allowlist that would
+        # reject valid outputs and force a re-run. Only skip explicit failures and
+        # responses with no usable sections.
+        if response.status in {"ai_unavailable", "error"} or not response.sections:
             return False
 
         collection = _collection()
