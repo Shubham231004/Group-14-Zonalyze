@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.demographics import DemographicZone
 from app.schemas.scenario import AnalyzeScenarioRequest
@@ -19,7 +19,7 @@ class PeopleLocationSensor(BaseSensor):
         demographic_row: DemographicZone,
     ) -> SensorPacket:
         return SensorPacket(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             device_name=self.device_name,
             sensor_type=self.sensor_type,
             selected_zone=request.municipality_name,

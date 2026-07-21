@@ -1,7 +1,7 @@
 """Unit tests for the in-memory message bus (no external dependencies)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -11,7 +11,7 @@ from app.schemas.sensor_packet import SensorPacket
 
 def _packet(sensor_type: str = "people_location") -> SensorPacket:
     return SensorPacket(
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         device_name="test_device",
         sensor_type=sensor_type,
         selected_zone="Kitchener",
@@ -50,3 +50,13 @@ def test_unknown_sensor_queries_are_safe():
     bus = MessageBus()
     assert bus.get_latest_packet("nope") is None
     assert bus.get_packet_history("nope") == []
+
+
+def test_history_is_bounded():
+    """History is capped so the in-memory bus cannot grow without bound."""
+    bus = MessageBus(history_maxlen=3)
+    bus.register_sensor("people_location", "people_location_monitor")
+    for _ in range(10):
+        bus.publish(_packet())
+    history = bus.get_packet_history("people_location")
+    assert len(history) == 3  # only the most recent 3 are retained

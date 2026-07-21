@@ -49,3 +49,21 @@ CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL", "").strip() or (
     f"{CLERK_ISSUER}/.well-known/jwks.json" if CLERK_ISSUER else ""
 )
 AUTH_ENABLED = bool(CLERK_ISSUER and CLERK_JWKS_URL)
+
+# --- CORS ---
+# Comma-separated allowlist of browser origins permitted to call the API.
+# Defaults to the local Vite dev server so behaviour is unchanged in dev.
+CORS_ALLOW_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
+
+# --- Rate limiting ---
+# OFF by default (best tuned against real traffic / at the gateway before a
+# public launch). Set RATE_LIMIT_ENABLED=true to activate; RATE_LIMIT uses
+# slowapi syntax and applies per client IP, per endpoint.
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "false").strip().lower() in {
+    "1", "true", "yes", "on",
+}
+RATE_LIMIT = os.getenv("RATE_LIMIT", "240/minute").strip()

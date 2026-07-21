@@ -1,4 +1,5 @@
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -9,6 +10,8 @@ from app.schemas.sensor_packet import MetricItem, SensorPacket
 from app.sensors.people_location_sensor import PeopleLocationSensor
 from app.services.demographics_repository import find_matching_demographic_zone
 from app.services.message_bus_service import publish_packet
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_feature(features: dict[str, Any], key: str, default: float = 0.0) -> float:
@@ -52,7 +55,7 @@ def _census_backed_packet(request: AnalyzeScenarioRequest, sensor: PeopleLocatio
         indicator = "red"
 
     packet = SensorPacket(
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         device_name=sensor.device_name,
         sensor_type=sensor.sensor_type,
         selected_zone=request.municipality_name,
@@ -106,9 +109,11 @@ def get_people_location_packet(
         packet = _census_backed_packet(request, sensor)
         publish_packet(packet)
         return packet
-    except Exception as exc:
+    except Exception:
+        # Log the full error server-side; do not leak internals to the client.
+        logger.warning("Census-backed packet build failed for scenario", exc_info=True)
         fallback_packet = SensorPacket(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             device_name=sensor.device_name,
             sensor_type=sensor.sensor_type,
             selected_zone=request.municipality_name,
@@ -120,7 +125,6 @@ def get_people_location_packet(
             meta={
                 "data_source": "none",
                 "status": "missing",
-                "error": str(exc),
             },
         )
         publish_packet(fallback_packet)

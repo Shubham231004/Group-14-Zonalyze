@@ -217,10 +217,13 @@ def ping_mongodb() -> dict[str, Any]:
             "message": "MongoDB connection is healthy.",
         }
     except Exception as exc:
+        # Log details server-side; never return the raw error (it can contain the
+        # connection URI / host) to the client.
+        logger.warning("MongoDB ping failed: %s", type(exc).__name__, exc_info=True)
         return {
             "status": "unreachable",
             "enabled": False,
             "database_name": _db_name(),
             "cache_enabled": False,
-            "message": f"MongoDB connection failed without crashing the app: {type(exc).__name__}: {exc}",
+            "message": "MongoDB is not reachable. Check the server configuration and network.",
         }

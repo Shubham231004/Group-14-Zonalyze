@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -60,6 +62,8 @@ from app.services.site_address_service import analyze_site_address
 from app.services.osm_service import fetch_osm_competitors, fetch_osm_transit, fetch_osm_commercial_activity
 
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 # Public router: endpoints that must stay reachable without authentication
@@ -85,11 +89,20 @@ def health_check():
 
 @router.get("/db-check")
 def db_check():
-    success, message = test_database_connection()
+    success, detail = test_database_connection()
+
+    if not success:
+        # Log the underlying error server-side; return a generic message so the
+        # response never exposes connection internals.
+        logger.warning("Database connectivity check failed: %s", detail)
+        return {
+            "database_connected": False,
+            "message": "Database connection failed.",
+        }
 
     return {
-        "database_connected": success,
-        "message": message
+        "database_connected": True,
+        "message": "Database connection successful",
     }
 
 
