@@ -28,6 +28,32 @@ def _default_model() -> str:
     return os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
 
 
+def allowed_models() -> set[str]:
+    """Model names a client is permitted to request.
+
+    The configured default is always allowed. Additional models can be
+    whitelisted via OLLAMA_ALLOWED_MODELS (comma-separated).
+    """
+    raw = os.getenv("OLLAMA_ALLOWED_MODELS", "").strip()
+    models = {name.strip() for name in raw.split(",") if name.strip()}
+    models.add(_default_model())
+    return models
+
+
+def resolve_model(requested: Optional[str]) -> str:
+    """Return a safe model name.
+
+    A client may only pick a model from the allowlist; any other value (or none)
+    falls back to the server default. This prevents callers from forcing the
+    server to pull/run arbitrary Ollama models (resource-abuse / injection risk).
+    """
+    default = _default_model()
+    if not requested:
+        return default
+    requested = requested.strip()
+    return requested if requested in allowed_models() else default
+
+
 def list_local_models(timeout_seconds: int = 3) -> List[str]:
     try:
         response = requests.get(f"{_base_url()}/api/tags", timeout=timeout_seconds)

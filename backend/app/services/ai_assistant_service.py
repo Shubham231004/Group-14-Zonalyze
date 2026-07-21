@@ -12,7 +12,7 @@ from app.services.ai_context_service import (
     fallback_answer,
 )
 from app.services.dashboard_service import analyze_scenario
-from app.services.local_ai_service import generate_with_ollama
+from app.services.local_ai_service import generate_with_ollama, resolve_model
 
 
 MAX_HISTORY_MESSAGES = 6
@@ -75,7 +75,9 @@ def answer_scenario_question(request: ScenarioChatRequest, db: Session) -> Scena
         chat_history_text=_history_to_text(request),
     )
 
-    ai_result = generate_with_ollama(prompt=prompt, model=request.model)
+    # Constrain the model to the server allowlist so a client cannot force an
+    # arbitrary Ollama model to be pulled/run.
+    ai_result = generate_with_ollama(prompt=prompt, model=resolve_model(request.model))
 
     if ai_result.available:
         answer = ai_result.answer
