@@ -1,0 +1,106 @@
+{
+  "model_version": "step18_business_catalog_v2",
+  "trained_at_utc": "2026-07-14T20:51:30.828342+00:00",
+  "dataset_path": "C:\\Users\\giris\\OneDrive - Conestoga College\\Semester 7\\Capstone\\Project\\Group-14-Zonalyze\\backend\\app\\data\\generated\\zonalyze_training_dataset_v2.csv",
+  "row_count": 50000,
+  "feature_count": 45,
+  "feature_columns": [
+    "municipality_name",
+    "business_subcategory",
+    "business_group",
+    "radius_km",
+    "population_2021",
+    "population_density",
+    "median_income",
+    "median_age",
+    "household_count",
+    "employment_rate",
+    "diversity_index",
+    "students_pct",
+    "families_pct",
+    "retirees_pct",
+    "immigrant_pct",
+    "visible_minority_pct",
+    "average_ticket_size",
+    "estimated_space_sqft",
+    "target_customer_rate",
+    "lease_sensitivity",
+    "competition_sensitivity",
+    "demand_sensitivity",
+    "reachable_population_estimate",
+    "target_customer_pool_estimate",
+    "demographic_fit_score",
+    "foot_traffic_proxy_index",
+    "transit_access_proxy_index",
+    "daytime_activity_index",
+    "competitor_count_same_type",
+    "nearest_competitor_distance_km",
+    "competitor_density_per_10k",
+    "competition_score_0_100",
+    "competition_pressure_index",
+    "lease_cost_per_sqft_year",
+    "low_monthly_lease_cost",
+    "median_monthly_lease_cost",
+    "high_monthly_lease_cost",
+    "rent_pressure_index",
+    "demand_pressure_index",
+    "demand_score_0_100",
+    "expected_customers_per_day",
+    "gross_revenue_monthly",
+    "monthly_operating_cost_estimate",
+    "lease_burden_ratio",
+    "profit_margin_pct"
+  ],
+  "categorical_features": [
+    "municipality_name",
+    "business_subcategory",
+    "business_group"
+  ],
+  "target_columns": [
+    "monthly_net_revenue",
+    "risk_class",
+    "feasibility_score",
+    "risk_score"
+  ],
+  "municipality_count": 355,
+  "business_subcategory_count": 26,
+  "risk_accuracy": 0.5857,
+  "risk_classification_report": {
+    "high": {
+      "precision": 0.4678687008784096,
+      "recall": 0.3518776077885953,
+      "f1-score": 0.401666997420123,
+      "support": 2876.0
+    },
+    "low": {
+      "precision": 0.7189922480620154,
+      "recall": 0.25203804347826086,
+      "f1-score": 0.3732394366197183,
+      "support": 1472.0
+    },
+    "medium": {
+      "precision": 0.6111186996311979,
+      "recall": 0.7915782024062279,
+      "f1-score": 0.6897402297078548,
+      "support": 5652.0
+    },
+    "accuracy": 0.5857,
+    "macro avg": {
+      "precision": 0.5993265495238743,
+      "recall": 0.46516461789102803,
+      "f1-score": 0.4882155545825653,
+      "support": 10000.0
+    },
+    "weighted avg": {
+      "precision": 0.5857989863189124,
+      "recall": 0.5857,
+      "f1-score": 0.5603014513593294,
+      "support": 10000.0
+    }
+  },
+  "revenue_r2": 0.9319,
+  "revenue_mae": 274.99,
+  "feasibility_r2": 0.9908,
+  "feasibility_mae": 0.21,
+  "important_note": "Models are trained on improved simulation-generated labels. They support prototype predictions and should not be presented as validated real-world financial outcomes."
+}

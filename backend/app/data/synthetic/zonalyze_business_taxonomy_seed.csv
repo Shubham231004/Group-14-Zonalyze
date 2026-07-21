@@ -1,0 +1,23 @@
+category,subcategory,avg_ticket,base_capture_rate,gross_margin_pct,space_sqft,monthly_staff_cost,monthly_utilities,competition_sensitivity,income_sensitivity,density_sensitivity,student_weight,young_adult_weight,family_weight,senior_weight,diversity_weight,immigrant_weight,labour_fit_column
+Grocery and Food Retail,General Grocery Store,42,0.014,0.32,4500,23000,3900,0.62,0.35,0.55,0.15,0.2,0.45,0.2,0.2,0.2,retail_trade_labour_pct
+Grocery and Food Retail,Indian Grocery Store,38,0.009,0.35,2800,14000,2600,0.52,0.3,0.6,0.12,0.22,0.38,0.12,0.75,0.85,retail_trade_labour_pct
+Grocery and Food Retail,Chinese Grocery Store,40,0.0085,0.34,3000,15000,2700,0.52,0.32,0.62,0.12,0.22,0.38,0.12,0.78,0.82,retail_trade_labour_pct
+Grocery and Food Retail,Jamaican Grocery Store,35,0.0078,0.36,2200,12000,2300,0.48,0.25,0.58,0.12,0.22,0.35,0.12,0.8,0.75,retail_trade_labour_pct
+Grocery and Food Retail,Halal Grocery Store,37,0.0085,0.36,2400,12500,2450,0.48,0.25,0.6,0.1,0.22,0.42,0.1,0.84,0.82,retail_trade_labour_pct
+Grocery and Food Retail,Organic Grocery Store,52,0.0065,0.39,2600,13000,2450,0.5,0.75,0.65,0.14,0.34,0.34,0.14,0.25,0.2,retail_trade_labour_pct
+Restaurants and Food Services,Casual Restaurant,28,0.01,0.62,2800,26000,4600,0.66,0.45,0.65,0.2,0.32,0.32,0.1,0.25,0.2,accommodation_food_labour_pct
+Restaurants and Food Services,Indian Restaurant,27,0.0082,0.64,2400,22000,4200,0.58,0.42,0.68,0.18,0.32,0.3,0.08,0.76,0.82,accommodation_food_labour_pct
+Restaurants and Food Services,Chinese Restaurant,25,0.0085,0.64,2400,21500,4200,0.6,0.4,0.68,0.18,0.3,0.32,0.1,0.78,0.8,accommodation_food_labour_pct
+Restaurants and Food Services,Jamaican Restaurant,24,0.0072,0.65,1800,18000,3500,0.52,0.35,0.62,0.2,0.32,0.26,0.08,0.8,0.75,accommodation_food_labour_pct
+Restaurants and Food Services,Vegan Restaurant,29,0.0068,0.66,1700,17000,3300,0.43,0.7,0.7,0.2,0.42,0.2,0.1,0.35,0.2,accommodation_food_labour_pct
+Restaurants and Food Services,Coffee Shop / Cafe,10,0.017,0.7,1400,13500,2100,0.7,0.45,0.8,0.45,0.35,0.12,0.08,0.2,0.2,accommodation_food_labour_pct
+Health and Wellness,Fitness Center,58,0.0052,0.55,7000,23000,5700,0.56,0.72,0.62,0.25,0.42,0.22,0.08,0.15,0.15,other_services_labour_pct
+Health and Wellness,Yoga Studio,72,0.0042,0.6,1800,11500,2000,0.45,0.78,0.7,0.14,0.48,0.2,0.12,0.18,0.12,other_services_labour_pct
+Personal Care,Barbershop,32,0.0068,0.62,1100,12000,1500,0.54,0.35,0.64,0.16,0.36,0.28,0.12,0.24,0.2,other_services_labour_pct
+Personal Care,Nail Salon,45,0.0055,0.63,1200,12500,1650,0.55,0.55,0.66,0.14,0.42,0.25,0.08,0.22,0.18,other_services_labour_pct
+Personal Care,Hair Salon,62,0.005,0.64,1300,13500,1800,0.55,0.55,0.62,0.12,0.36,0.28,0.14,0.18,0.15,other_services_labour_pct
+Specialty Retail,Clothing Boutique,68,0.0038,0.52,1600,10500,1800,0.58,0.7,0.62,0.12,0.42,0.28,0.1,0.25,0.15,retail_trade_labour_pct
+Specialty Retail,Pet Supply Store,46,0.0045,0.44,2200,11000,2100,0.45,0.52,0.5,0.08,0.22,0.5,0.16,0.1,0.08,retail_trade_labour_pct
+Specialty Retail,Electronics Repair Shop,95,0.0028,0.56,900,9000,1350,0.38,0.45,0.6,0.22,0.42,0.22,0.1,0.2,0.18,retail_trade_labour_pct
+Professional and Local Services,Accounting Office,220,0.0013,0.74,1200,15500,1350,0.35,0.65,0.45,0.05,0.22,0.42,0.22,0.12,0.18,other_services_labour_pct
+Professional and Local Services,Tutoring Centre,38,0.0045,0.66,1500,12500,1600,0.4,0.6,0.52,0.4,0.18,0.5,0.04,0.22,0.25,other_services_labour_pct
