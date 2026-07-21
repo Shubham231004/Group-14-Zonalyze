@@ -2,6 +2,8 @@ alembic==1.18.5
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.12.1
+cryptography==44.0.0
+PyJWT==2.10.1
 certifi==2026.4.22
 charset-normalizer==3.4.7
 click==8.3.1

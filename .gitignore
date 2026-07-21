@@ -8,8 +8,10 @@ venv/
 env/
 backend/Zonalyze/
 
-# Environment files
+# Environment files (all variants, in any directory) — but keep the templates.
 .env
+.env.*
+!.env.example
 *.zip
 *.csv
 *.docx

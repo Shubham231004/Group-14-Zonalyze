@@ -39,3 +39,13 @@ DATABASE_URL = (
 # competitor marker addresses when OpenStreetMap does not provide addr:* tags.
 # Keep the real token in backend/.env and do not commit it to GitHub.
 MAPBOX_ACCESS_TOKEN = os.getenv("MAPBOX_ACCESS_TOKEN", "")
+
+# --- Authentication (Clerk) ---
+# Auth is DISABLED unless CLERK_ISSUER is set, so the app runs exactly as before
+# until you deliberately opt in by configuring Clerk. When only the issuer is
+# provided, the JWKS URL is derived from it.
+CLERK_ISSUER = os.getenv("CLERK_ISSUER", "").strip().rstrip("/")
+CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL", "").strip() or (
+    f"{CLERK_ISSUER}/.well-known/jwks.json" if CLERK_ISSUER else ""
+)
+AUTH_ENABLED = bool(CLERK_ISSUER and CLERK_JWKS_URL)

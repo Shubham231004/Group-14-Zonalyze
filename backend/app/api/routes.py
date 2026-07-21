@@ -62,15 +62,20 @@ from app.services.osm_service import fetch_osm_competitors, fetch_osm_transit, f
 
 router = APIRouter()
 
+# Public router: endpoints that must stay reachable without authentication
+# (liveness checks, load balancers). Everything on `router` is auth-protected
+# when Clerk is configured; these two are not.
+public_router = APIRouter()
 
-@router.get("/")
+
+@public_router.get("/")
 def root():
     return {
         "message": "Zonalyze backend is running"
     }
 
 
-@router.get("/health")
+@public_router.get("/health")
 def health_check():
     return {
         "status": "ok",

@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import router
+from app.api.routes import public_router, router
+from app.core.auth import require_user
 from app.core.config import APP_NAME, APP_VERSION
 from app.ml.predictor import ModelsUnavailableError
 from app.services.message_bus_service import register_sensor
@@ -49,4 +50,8 @@ async def models_unavailable_handler(request: Request, exc: ModelsUnavailableErr
     )
 
 
-app.include_router(router)
+# Public endpoints (health/root) stay open; everything else requires a valid
+# Clerk session token when auth is enabled. When Clerk is not configured,
+# require_user is a no-op and all routes behave exactly as before.
+app.include_router(public_router)
+app.include_router(router, dependencies=[Depends(require_user)])
