@@ -28,6 +28,10 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run tests
+        # A dummy DB password satisfies config's fail-fast check; these tests do
+        # not open a real database connection.
+        env:
+          DB_PASSWORD: ci-not-a-real-password
         run: python -m pytest
 
       # Informational only for now; hardened to a hard gate in a later phase.
