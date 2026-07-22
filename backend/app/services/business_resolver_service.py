@@ -14,6 +14,7 @@ from app.schemas.business_resolver import (
     OSMTagSuggestion,
 )
 from app.services.local_ai_service import generate_json_with_ollama
+from app.services.business_matching_service import map_idea_to_catalog_subcategory
 from app.services.business_resolution_cache_service import (
     get_cached_business_resolution,
     save_business_resolution_cache,
@@ -589,6 +590,21 @@ def _coerce_ai_payload(payload: Dict[str, Any], business_query: str) -> Dict[str
 
 
 def resolve_business_query(request: BusinessResolveRequest) -> BusinessResolveResponse:
+    """Resolve a free-text idea, then attach the nearest trained catalog subcategory.
+
+    The nearest-catalog fields let the frontend request an ML feasibility score for
+    a free-text idea while being honest that it is based on the closest known type.
+    """
+    response = _resolve_business_query_impl(request)
+    match = map_idea_to_catalog_subcategory(response)
+    response.nearest_catalog_subcategory = match.subcategory
+    response.nearest_catalog_confidence = match.confidence
+    response.score_basis = match.basis
+    response.score_basis_note = match.label
+    return response
+
+
+def _resolve_business_query_impl(request: BusinessResolveRequest) -> BusinessResolveResponse:
     business_query = _normalize_text(request.business_query, 240)
 
     if not business_query:

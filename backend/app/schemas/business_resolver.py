@@ -46,3 +46,11 @@ class BusinessResolveResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list)
     next_steps: List[str] = Field(default_factory=list)
     raw_ai_error: Optional[str] = None
+
+    # Nearest trained catalog subcategory for feasibility scoring. Lets the frontend
+    # request an ML score for a free-text idea while being honest that the score is
+    # based on the closest known business type. None when nothing matched.
+    nearest_catalog_subcategory: Optional[str] = None
+    nearest_catalog_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    score_basis: str = "unavailable"
+    score_basis_note: str = ""

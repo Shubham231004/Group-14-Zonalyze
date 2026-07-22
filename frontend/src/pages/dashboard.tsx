@@ -1,6 +1,6 @@
 // frontend/src/pages/dashboard.tsx
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -46,6 +46,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -85,6 +87,7 @@ import {
   type BusinessSubcategoryOption,
   type DashboardSummaryResponse,
   type GeospatialMarketContext,
+  type GeospatialMarketMapRequest,
   type MunicipalityOption,
   type ModelStatusResponse,
   type ScenarioComparisonResponse,
@@ -210,15 +213,40 @@ function readableRecommendation(value?: string) {
   return value.replace(/_/g, " ").toUpperCase();
 }
 
-function MarketMapPanel({ geoContext }: { geoContext: GeospatialMarketContext | null }) {
+function MarketMapPanel({
+  geoContext,
+  isLoading,
+  error,
+  onRetry,
+}: {
+  geoContext: GeospatialMarketContext | null;
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
   if (!geoContext) {
     return (
       <Card className="scada-panel border-white/5">
         <CardContent className="p-8 flex flex-col items-center justify-center min-h-[400px]">
-          <Signal className="w-8 h-8 text-primary animate-pulse mb-3" />
-          <p className="text-xs font-mono lcd-text text-muted-foreground">
-            Geospatial market context is loading...
-          </p>
+          {error && !isLoading ? (
+            <>
+              <Signal className="w-8 h-8 text-destructive mb-3" />
+              <p className="text-xs font-mono lcd-text text-muted-foreground text-center max-w-sm mb-4">
+                The market map could not be loaded. This does not affect your
+                scenario analysis.
+              </p>
+              <Button variant="outline" size="sm" onClick={onRetry}>
+                Retry map
+              </Button>
+            </>
+          ) : (
+            <>
+              <Signal className="w-8 h-8 text-primary animate-pulse mb-3" />
+              <p className="text-xs font-mono lcd-text text-muted-foreground">
+                Geospatial market context is loading...
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
     );
@@ -238,6 +266,9 @@ export default function Dashboard() {
   const [radius, setRadius] = useState<number[]>([DEFAULT_RADIUS]);
   const [municipalityName, setMunicipalityName] =
     useState(DEFAULT_MUNICIPALITY);
+  // Optional specific street address. When set, the whole analysis (radius, map,
+  // competitors, transit) anchors on this exact point instead of the city centre.
+  const [siteAddress, setSiteAddress] = useState("");
   const [businessSubcategory, setBusinessSubcategory] =
     useState(DEFAULT_BUSINESS);
   const [businessInputMode, setBusinessInputMode] =
@@ -266,6 +297,10 @@ export default function Dashboard() {
   const [modelStatus, setModelStatus] = useState<ModelStatusResponse | null>(null);
   const [scenarioHistory, setScenarioHistory] = useState<ScenarioHistoryItem[]>([]);
   const [geoContext, setGeoContext] = useState<GeospatialMarketContext | null>(null);
+  // The market map loads independently of the scenario analysis so a slow or
+  // failed Overpass call never blocks the UI or fails the scenario report.
+  const [isGeoLoading, setIsGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const [scenarioComparison, setScenarioComparison] =
     useState<ScenarioComparisonResponse | null>(null);
   const [isSavingScenario, setIsSavingScenario] = useState(false);
@@ -284,6 +319,10 @@ export default function Dashboard() {
 
   const debounceRef = useRef<number | null>(null);
   const initialLoadDoneRef = useRef(false);
+  // Monotonic id so only the most recent market-map request updates the map.
+  // Without this, slow out-of-order responses overwrite each other and the map
+  // flickers between locations (e.g. Kitchener → Cambridge).
+  const geoRequestSeq = useRef(0);
 
   const ml = dashboardData?.ml_prediction ?? null;
   const explanation = dashboardData?.prediction_explanation ?? null;
@@ -332,9 +371,11 @@ export default function Dashboard() {
     businessResolution?.status === "resolved";
 
   const activeGeoPayload = useMemo(() => {
+    const site_address = siteAddress.trim() || undefined;
     if (shouldUseCustomBusinessMap) {
       return {
         municipality_name: municipalityName,
+        site_address,
         business_query: customBusinessQuery.trim(),
         radius_km: radius[0],
       };
@@ -342,39 +383,67 @@ export default function Dashboard() {
 
     return {
       municipality_name: municipalityName,
+      site_address,
       business_subcategory: businessSubcategory,
       radius_km: radius[0],
     };
   }, [
     shouldUseCustomBusinessMap,
     municipalityName,
+    siteAddress,
     customBusinessQuery,
     radius,
     businessSubcategory,
   ]);
+
+  // Fetch the market map on its own loading/error track. Never throws to the
+  // caller, so scenario analysis and startup can proceed regardless of the map.
+  const loadGeoContext = useCallback(async (payload: GeospatialMarketMapRequest) => {
+    // Tag this request; only the latest one is allowed to update the map, so slow
+    // out-of-order responses can't overwrite the current location (no flicker).
+    // Duplicate-hit protection lives in the backend cache, so every change fetches.
+    const seq = ++geoRequestSeq.current;
+    setIsGeoLoading(true);
+    setGeoError(null);
+    try {
+      const geoResponse = await fetchGeospatialMarketMap(payload);
+      if (seq !== geoRequestSeq.current) return; // superseded by a newer request
+      setGeoContext(geoResponse);
+    } catch (error) {
+      if (seq !== geoRequestSeq.current) return; // superseded — ignore this failure
+      // Clear the previous result so we never keep showing a different location's
+      // map (the old "I picked a new city but still see Kitchener" bug). The map
+      // panel then shows a retry tied to the requested input.
+      setGeoContext(null);
+      setGeoError(
+        error instanceof Error
+          ? error.message
+          : "The market map could not be loaded from the backend.",
+      );
+    } finally {
+      if (seq === geoRequestSeq.current) setIsGeoLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     async function loadStartupData() {
       try {
         setIsInitialLoading(true);
 
-        const [municipalitiesData, businessData, modelStatusData, historyData, geoData] = await Promise.all([
+        // Only UI-critical calls block the initial render. The market map is
+        // deliberately excluded so the analysis controls appear immediately
+        // even when Overpass is slow.
+        const [municipalitiesData, businessData, modelStatusData, historyData] = await Promise.all([
           fetchMunicipalities(),
           fetchBusinessSubcategories(),
           fetchModelStatus().catch(() => null),
           fetchScenarioHistory().catch(() => null),
-          fetchGeospatialMarketMap({
-            municipality_name: DEFAULT_MUNICIPALITY,
-            business_subcategory: DEFAULT_BUSINESS,
-            radius_km: DEFAULT_RADIUS,
-          }).catch(() => null),
         ]);
 
         setMunicipalityOptions(municipalitiesData.municipalities);
         setBusinessOptions(businessData.business_subcategories);
         setModelStatus(modelStatusData);
         setScenarioHistory(historyData?.scenarios ?? []);
-        setGeoContext(geoData);
 
         let firstDashboard: DashboardSummaryResponse;
         try {
@@ -397,6 +466,13 @@ export default function Dashboard() {
         setRadius([firstDashboard.radius_km || DEFAULT_RADIUS]);
         setLastUpdate(new Date());
         initialLoadDoneRef.current = true;
+
+        // Kick off the map independently — do not await it on the critical path.
+        void loadGeoContext({
+          municipality_name: firstDashboard.municipality_name || DEFAULT_MUNICIPALITY,
+          business_subcategory: firstDashboard.business_subcategory || DEFAULT_BUSINESS,
+          radius_km: firstDashboard.radius_km || DEFAULT_RADIUS,
+        });
       } catch (error) {
         toast({
           title: "Dashboard loading failed",
@@ -412,7 +488,7 @@ export default function Dashboard() {
     }
 
     loadStartupData();
-  }, [toast]);
+  }, [toast, loadGeoContext]);
 
   useEffect(() => {
     if (!initialLoadDoneRef.current) return;
@@ -432,8 +508,6 @@ export default function Dashboard() {
         });
 
         setDashboardData(response);
-        const geoResponse = await fetchGeospatialMarketMap(activeGeoPayload as any);
-        setGeoContext(geoResponse);
         setLastUpdate(new Date());
       } catch (error) {
         toast({
@@ -447,6 +521,10 @@ export default function Dashboard() {
       } finally {
         setIsUpdating(false);
       }
+
+      // Refresh the map independently. A map failure surfaces in the map panel
+      // itself (with retry) and must not fail the scenario analysis above.
+      void loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest);
     }, 450);
 
     return () => {
@@ -464,38 +542,69 @@ export default function Dashboard() {
     useCustomBusinessForMap,
     businessResolution?.status,
     toast,
+    loadGeoContext,
   ]);
 
-  // Simulated Loading Sequence
-  const handleStartAnalysis = () => {
+  // Real loading sequence: the progress bar tracks the ACTUAL backend work and
+  // only completes once the analysis (and the map, within a bounded wait) is back,
+  // so the workspace appears fully populated instead of animating on a fake timer.
+  const handleStartAnalysis = async () => {
     setIsAnalyzing(true);
     setLoadingProgress(0);
     setLoadingStep("Loading Statistics Canada Census demographic datasets...");
 
-    const interval = setInterval(() => {
+    const stepMessages: Record<number, string> = {
+      15: "Connecting to PostgreSQL; retrieving catchment populations...",
+      35: "Running Random Forest ML estimators for feasibility & net revenue...",
+      55: "Resolving the analysis location & business interpretation...",
+      72: "Fetching live map evidence from OpenStreetMap...",
+      88: "Compiling the decision-support recommendation...",
+    };
+
+    // Ease the bar toward 90% while the real work runs; hold there until data lands.
+    const interval = window.setInterval(() => {
       setLoadingProgress((prev) => {
         const next = prev + 1;
-        if (next >= 100) {
-          clearInterval(interval);
-          setIsAnalyzing(false);
-          setIsScenarioSelected(true);
-          return 100;
-        }
-
-        if (next === 20) {
-          setLoadingStep("Connecting to PostgreSQL; retrieving catchment populations...");
-        } else if (next === 40) {
-          setLoadingStep("Running Random Forest ML estimators for feasibility & net revenue...");
-        } else if (next === 65) {
-          setLoadingStep("Resolving live competitor nodes from OpenStreetMap Overpass API...");
-        } else if (next === 80) {
-          setLoadingStep("Calculating local lease costs & demand proxies...");
-        } else if (next === 93) {
-          setLoadingStep("Compiling decision-support recommendation index...");
-        }
+        if (next >= 90) return 90;
+        if (stepMessages[next]) setLoadingStep(stepMessages[next]);
         return next;
       });
-    }, 60); // Total 6000ms (6 seconds)
+    }, 45);
+
+    try {
+      // Feasibility numbers (ML/census) — fast, no external APIs.
+      const response = await analyzeScenario({
+        municipality_name: municipalityName,
+        business_subcategory: businessSubcategory,
+        radius_km: radius[0],
+      });
+      setDashboardData(response);
+      setLastUpdate(new Date());
+
+      // Map/competitors — bounded so a slow or rate-limited Overpass can't stall the
+      // whole screen. If it isn't ready in time, the workspace still opens and the
+      // map finishes (or shows its honest retry state) on its own.
+      const mapLoad = loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest);
+      await Promise.race([
+        mapLoad,
+        new Promise((resolve) => window.setTimeout(resolve, 18000)),
+      ]);
+    } catch (error) {
+      toast({
+        title: "Analysis failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Could not run the analysis. Make sure the backend is running.",
+        variant: "destructive",
+      });
+    } finally {
+      window.clearInterval(interval);
+      setLoadingProgress(100);
+      setLoadingStep("Ready.");
+      setIsScenarioSelected(true);
+      setIsAnalyzing(false);
+    }
   };
 
   const handleExport = async () => {
@@ -779,44 +888,48 @@ export default function Dashboard() {
                   <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5" /> Target Municipality
                   </label>
-                  <Select value={municipalityName} onValueChange={setMunicipalityName}>
-                    <SelectTrigger className="bg-background/50 border-white/10 font-mono text-sm h-11 rounded-xl focus:ring-primary">
-                      <SelectValue placeholder="Select municipality" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-white/10 max-h-[300px]">
-                      {municipalityOptions.map((city) => (
-                        <SelectItem
-                          key={`${city.municipality_name}-${city.municipality_type}`}
-                          value={city.municipality_name}
-                          className="font-mono text-sm"
-                        >
-                          {city.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={municipalityName}
+                    onValueChange={setMunicipalityName}
+                    options={municipalityOptions.map((city) => ({
+                      value: city.municipality_name,
+                      label: city.label,
+                    }))}
+                    placeholder="Select municipality"
+                    searchPlaceholder="Search or type any Ontario city..."
+                    allowCustomValue
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" /> Specific Address <span className="opacity-60">(optional)</span>
+                  </label>
+                  <Input
+                    value={siteAddress}
+                    onChange={(event) => setSiteAddress(event.target.value)}
+                    placeholder="e.g. 100 King St W — anchors the radius here"
+                    className="bg-background/50 border-white/10 font-mono text-sm h-11 rounded-xl focus-visible:ring-primary"
+                  />
+                  <p className="text-[10px] text-muted-foreground/70">
+                    Leave blank to analyse from the city centre. Add an address to centre the radius on a specific storefront.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
                     <Store className="w-3.5 h-3.5" /> Business Subcategory
                   </label>
-                  <Select value={businessSubcategory} onValueChange={setBusinessSubcategory}>
-                    <SelectTrigger className="bg-background/50 border-white/10 font-mono text-sm h-11 rounded-xl focus:ring-primary">
-                      <SelectValue placeholder="Select business" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-white/10 max-h-[300px]">
-                      {businessOptions.map((business) => (
-                        <SelectItem
-                          key={`${business.business_category}-${business.business_subcategory}`}
-                          value={business.business_subcategory}
-                          className="font-mono text-sm"
-                        >
-                          {business.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={businessSubcategory}
+                    onValueChange={setBusinessSubcategory}
+                    options={businessOptions.map((business) => ({
+                      value: business.business_subcategory,
+                      label: business.label,
+                    }))}
+                    placeholder="Select business"
+                    searchPlaceholder="Search business types..."
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -1288,7 +1401,51 @@ export default function Dashboard() {
                 {/* 2. GEOSPATIAL MAP TAB */}
                 {activeTab === "map" && (
                   <>
-                    <MarketMapPanel geoContext={geoContext} />
+                    {geoContext ? (
+                      <div className="mb-3 space-y-2">
+                        {/* Honest reference-point banner: address anchor vs city centre */}
+                        <div
+                          className={`rounded-xl border px-4 py-2.5 text-xs font-mono flex items-start gap-2 ${
+                            geoContext.anchor_type === "address"
+                              ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-200"
+                              : "border-amber-500/25 bg-amber-500/5 text-amber-200"
+                          }`}
+                        >
+                          <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <span>
+                            {geoContext.anchor_note ||
+                              (geoContext.anchor_type === "address"
+                                ? `Centred on ${geoContext.resolved_address}`
+                                : `Centred on ${geoContext.municipality_name} city centre.`)}
+                            {geoContext.municipality_match === false
+                              ? " ⚠ This address may be outside the selected municipality — confirm before trusting the numbers."
+                              : ""}
+                          </span>
+                        </div>
+                        {/* Honest feasibility-score basis banner */}
+                        {geoContext.score_basis &&
+                        geoContext.score_basis !== "exact_catalog" &&
+                        geoContext.score_basis_note ? (
+                          <div
+                            className={`rounded-xl border px-4 py-2.5 text-xs font-mono flex items-start gap-2 ${
+                              geoContext.score_basis === "unavailable"
+                                ? "border-rose-500/25 bg-rose-500/5 text-rose-200"
+                                : "border-sky-500/25 bg-sky-500/5 text-sky-200"
+                            }`}
+                          >
+                            <Store className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                            <span>{geoContext.score_basis_note}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <MarketMapPanel
+                      geoContext={geoContext}
+                      isLoading={isGeoLoading}
+                      error={geoError}
+                      onRetry={() => loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest)}
+                    />
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Site Address Panel */}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
@@ -34,6 +35,8 @@ from app.services.osm_service import (
 from app.services.mapbox_geocoding_service import enrich_missing_addresses
 from app.schemas.business_resolver import BusinessResolveRequest
 from app.services.business_resolver_service import resolve_business_query
+from app.services.business_matching_service import map_idea_to_catalog_subcategory
+from app.services.site_address_service import _geocode_site_address, _confidence_from_geocode
 from app.services.footfall_heatmap_service import build_footfall_heatmap_points
 
 
@@ -328,62 +331,116 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
             resolved_business_name = dynamic_resolution.normalized_business_name or business_query
 
     display_business_name = resolved_business_name or business_subcategory or business_query or "Unresolved business idea"
-    analysis_business_subcategory = business_subcategory or display_business_name
+
+    # --- Location anchor: a specific address (precise) if given, else city centre ---
+    # The user's input decides the reference point. When a real address geocodes,
+    # the radius and every OSM evidence layer centre on that exact point, and the
+    # census/ML uses the municipality the address actually falls in.
+    site_address = _normalize_place_name(_get_request_value(request, "site_address", "") or "")
+    anchor_type = "city_center"
+    resolved_address: Optional[str] = None
+    geocode_confidence: Optional[str] = None
+    municipality_match: Optional[bool] = None
+    anchor_note = ""
+    census_municipality = municipality_name
+
+    if site_address:
+        geocode, _candidates, _warnings = _geocode_site_address(site_address, municipality_name)
+        if geocode:
+            center_lat = float(geocode["latitude"])
+            center_lng = float(geocode["longitude"])
+            anchor_type = "address"
+            resolved_address = str(geocode.get("display_name") or site_address)
+            geocode_confidence = _confidence_from_geocode(geocode)
+            resolved_muni = _normalize_place_name(str(geocode.get("resolved_municipality") or ""))
+            municipality_match = bool(resolved_muni) and resolved_muni.lower() == municipality_name.lower()
+            census_municipality = resolved_muni or municipality_name
+            anchor_note = f"Analysis centred on the geocoded address: {resolved_address}."
+        else:
+            center_lat, center_lng = _center_for_municipality(municipality_name)
+            anchor_note = (
+                f"The address '{site_address}' could not be geocoded, so the analysis is centred on "
+                f"{municipality_name} city centre instead. Add a full street address for site-level accuracy."
+            )
+    else:
+        center_lat, center_lng = _center_for_municipality(municipality_name)
+        anchor_note = (
+            f"Centred on {municipality_name} city centre. Add a specific address for site-level accuracy."
+        )
+
+    geocode_fallback_used = (round(center_lat, 4), round(center_lng, 4)) == (44.0000, -79.5000)
+
+    # --- Feasibility scoring basis: exact catalog, nearest catalog, or unavailable ---
+    # The ML model only knows the trained catalog subcategories. A free-text idea is
+    # mapped to the closest trained type so a score can still be shown -- clearly
+    # labelled as an approximation -- or honestly reported as unavailable.
+    if business_subcategory:
+        score_subcategory: Optional[str] = business_subcategory
+        score_basis = "exact_catalog"
+        score_basis_note = f"Feasibility uses the trained model for '{business_subcategory}'."
+    elif dynamic_resolution is not None:
+        match = map_idea_to_catalog_subcategory(dynamic_resolution, raw_text=business_query)
+        score_subcategory = match.subcategory
+        score_basis = match.basis
+        score_basis_note = match.label
+    else:
+        score_subcategory = None
+        score_basis = "unavailable"
+        score_basis_note = "No trained business type was provided, so no feasibility score is available."
+
+    analysis_business_subcategory = score_subcategory or business_subcategory or display_business_name
 
     features: Dict[str, Any] = {}
     competition = None
     demand = None
     lease = None
 
-    try:
-        features = build_prediction_features(
-            municipality_name=municipality_name,
-            business_subcategory=analysis_business_subcategory,
-            radius_km=radius_km,
-        )
-        population = float(features.get("population_2021", 0) or 0)
-        competition = get_competition_observation(
-            municipality_name=municipality_name,
-            business_subcategory=analysis_business_subcategory,
-            radius_km=radius_km,
-            population=population,
-        )
-        demand = get_demand_evidence(
-            municipality_name=municipality_name,
-            business_subcategory=analysis_business_subcategory,
-            radius_km=radius_km,
-            features=features,
-        )
-        lease = get_lease_cost_evidence(
-            municipality_name=municipality_name,
-            business_subcategory=analysis_business_subcategory,
-            radius_km=radius_km,
-            features=features,
-        )
-    except Exception:
-        # Dynamic free-text businesses may not exist in the current model/catalog.
-        # We do not fake financial/demand/lease evidence here. The map can still
-        # show OSM POIs from resolved tags, but confidence stays limited.
-        features = {}
-        competition = None
-        demand = None
-        lease = None
-
-    center_lat, center_lng = _center_for_municipality(municipality_name)
-    geocode_fallback_used = (round(center_lat, 4), round(center_lng, 4)) == (44.0000, -79.5000)
-
-    if dynamic_resolution is not None:
-        if dynamic_resolution.status == "resolved" and dynamic_resolution.osm_tags:
-            competitor_result = fetch_osm_pois_by_resolved_tags(
-                resolved_tags=dynamic_resolution.osm_tags,
-                business_label=display_business_name,
-                center_lat=center_lat,
-                center_lon=center_lng,
+    if score_subcategory:
+        try:
+            features = build_prediction_features(
+                municipality_name=census_municipality,
+                business_subcategory=score_subcategory,
                 radius_km=radius_km,
-                limit=60,
             )
-        else:
-            competitor_result = OSMFetchResult(
+            population = float(features.get("population_2021", 0) or 0)
+            competition = get_competition_observation(
+                municipality_name=census_municipality,
+                business_subcategory=score_subcategory,
+                radius_km=radius_km,
+                population=population,
+            )
+            demand = get_demand_evidence(
+                municipality_name=census_municipality,
+                business_subcategory=score_subcategory,
+                radius_km=radius_km,
+                features=features,
+            )
+            lease = get_lease_cost_evidence(
+                municipality_name=census_municipality,
+                business_subcategory=score_subcategory,
+                radius_km=radius_km,
+                features=features,
+            )
+        except Exception:
+            # Census/model data may not exist for this municipality or type. We do
+            # not fake financial/demand/lease evidence; the map still shows OSM POIs.
+            features = {}
+            competition = None
+            demand = None
+            lease = None
+
+    def _fetch_competitors() -> OSMFetchResult:
+        if dynamic_resolution is not None:
+            if dynamic_resolution.status == "resolved" and dynamic_resolution.osm_tags:
+                return fetch_osm_pois_by_resolved_tags(
+                    resolved_tags=dynamic_resolution.osm_tags,
+                    business_label=display_business_name,
+                    center_lat=center_lat,
+                    center_lon=center_lng,
+                    radius_km=radius_km,
+                    limit=60,
+                )
+            return OSMFetchResult(
                 status="business_resolution_needs_review",
                 note=(
                     "Dynamic business resolution did not produce validated OSM tags. "
@@ -391,8 +448,7 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
                 ),
                 elements=[],
             )
-    else:
-        competitor_result = fetch_osm_competitors(
+        return fetch_osm_competitors(
             business_subcategory=analysis_business_subcategory,
             center_lat=center_lat,
             center_lon=center_lng,
@@ -400,13 +456,30 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
             limit=60,
         )
 
-    transit_result = fetch_osm_transit(center_lat=center_lat, center_lon=center_lng, radius_km=radius_km, limit=30)
-    commercial_activity_result = fetch_osm_commercial_activity(
-        center_lat=center_lat,
-        center_lon=center_lng,
-        radius_km=radius_km,
-        limit=50,
-    )
+    # The three OSM queries are independent network calls. Running them in parallel
+    # bounds the market-map latency to the slowest single query instead of the sum
+    # of all three — the difference between a map that renders and one that trips
+    # the frontend's request timeout when a mirror is slow. (Overpass mirror
+    # failover already lives in osm_service._fetch_overpass.)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        competitor_future = pool.submit(_fetch_competitors)
+        transit_future = pool.submit(
+            fetch_osm_transit,
+            center_lat=center_lat,
+            center_lon=center_lng,
+            radius_km=radius_km,
+            limit=30,
+        )
+        commercial_future = pool.submit(
+            fetch_osm_commercial_activity,
+            center_lat=center_lat,
+            center_lon=center_lng,
+            radius_km=radius_km,
+            limit=50,
+        )
+        competitor_result = competitor_future.result()
+        transit_result = transit_future.result()
+        commercial_activity_result = commercial_future.result()
 
     competitor_pois = enrich_missing_addresses(
         competitor_result.elements,
@@ -549,6 +622,14 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
         business_resolution=business_resolution_context,
         radius_km=radius_km,
         center=GeoCoordinate(latitude=center_lat, longitude=center_lng),
+        anchor_type=anchor_type,
+        resolved_address=resolved_address,
+        geocode_confidence=geocode_confidence,
+        municipality_match=municipality_match,
+        anchor_note=anchor_note,
+        score_basis=score_basis,
+        score_basis_subcategory=score_subcategory,
+        score_basis_note=score_basis_note,
         map_method="mapbox_or_leaflet_osm_overpass_dynamic_business_tags" if dynamic_resolution else "mapbox_or_leaflet_osm_overpass_plus_evidence_layers",
         map_credibility="medium" if osm_query_status.startswith("live_osm") else "limited",
         coverage_note=(

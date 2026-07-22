@@ -88,6 +88,14 @@ class BusinessResolutionMapContext(BaseModel):
 class GeospatialMarketRequest(BaseModel):
     municipality_name: str = Field(..., example="Kitchener")
     radius_km: float = Field(..., ge=1, le=25, example=5)
+    site_address: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional specific street address. When provided, the analysis radius and every "
+            "OSM evidence layer are centred on this exact address instead of the municipality centre."
+        ),
+        example="100 King St W",
+    )
     business_subcategory: Optional[str] = Field(
         default=None,
         description="Existing catalog-backed business subcategory. Kept for backward compatibility and current prediction/evidence flow.",
@@ -115,6 +123,24 @@ class GeospatialMarketContext(BaseModel):
     business_subcategory: str
     radius_km: float
     center: GeoCoordinate
+
+    # Where the radius/evidence is anchored. "address" when a specific site_address
+    # was geocoded successfully; "city_center" otherwise. resolved_address names the
+    # exact geocoded site so the UI can be honest about the reference point.
+    anchor_type: str = "city_center"
+    resolved_address: Optional[str] = None
+    geocode_confidence: Optional[str] = None
+    municipality_match: Optional[bool] = None
+    anchor_note: str = ""
+
+    # How the feasibility score was derived for the requested business input.
+    #   "exact_catalog"   -> user picked a trained catalog subcategory
+    #   "nearest_catalog" -> free-text idea mapped to the closest trained type
+    #   "unavailable"     -> no confident catalog match; map/competitors only
+    score_basis: str = "exact_catalog"
+    score_basis_subcategory: Optional[str] = None
+    score_basis_note: str = ""
+
     map_method: str
     map_credibility: str
     coverage_note: str

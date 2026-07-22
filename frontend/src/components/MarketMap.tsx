@@ -38,6 +38,10 @@ function isCompetitorMarker(type?: string): boolean {
   return (type || "").toLowerCase().includes("competitor");
 }
 
+// Honest centre: use exactly what the backend anchored the analysis on (an address
+// or the city centre). No hardcoded Kitchener fallback — a missing centre must not
+// silently masquerade as Kitchener. Ontario's rough geographic centre is only used
+// if the backend somehow sends no coordinate at all.
 function getCenter(geoContext: GeospatialMarketContext): [number, number] {
   const lat = geoContext.center?.latitude;
   const lng = geoContext.center?.longitude;
@@ -46,7 +50,7 @@ function getCenter(geoContext: GeospatialMarketContext): [number, number] {
     return [lat, lng];
   }
 
-  return [43.4516, -80.4925];
+  return [44.0, -79.5];
 }
 
 function markerColor(type?: string): string {

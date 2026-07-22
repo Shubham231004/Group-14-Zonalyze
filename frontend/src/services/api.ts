@@ -262,6 +262,17 @@ export interface GeospatialMarketContext {
   business_subcategory: string;
   radius_km: number;
   center: GeoCoordinate;
+  // Where the radius/evidence is anchored: "address" (a specific site geocoded) or
+  // "city_center". resolved_address names the exact geocoded site when available.
+  anchor_type?: string;
+  resolved_address?: string | null;
+  geocode_confidence?: string | null;
+  municipality_match?: boolean | null;
+  anchor_note?: string;
+  // How the feasibility score was derived for the requested business input.
+  score_basis?: "exact_catalog" | "nearest_catalog" | "unavailable" | string;
+  score_basis_subcategory?: string | null;
+  score_basis_note?: string;
   map_method: string;
   map_credibility: string;
   coverage_note: string;
@@ -313,6 +324,7 @@ export interface AnalyzeScenarioRequest {
 export interface GeospatialMarketMapRequest {
   municipality_name: string;
   radius_km: number;
+  site_address?: string;
   business_subcategory?: string;
   business_query?: string;
 }

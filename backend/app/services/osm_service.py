@@ -9,6 +9,7 @@ import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 from app.catalogs.business_subcategories import get_business_profile_dict, get_osm_tags_for_subcategory
@@ -37,7 +38,10 @@ def _overpass_endpoints() -> List[str]:
 
 # Kept for backward compatibility (first/primary endpoint).
 OVERPASS_URL = _DEFAULT_OVERPASS_ENDPOINTS[0]
-OVERPASS_TIMEOUT_SECONDS = int(os.getenv("OVERPASS_TIMEOUT_SECONDS", "18"))
+# Bounded so that, even if every mirror in the failover chain times out, the
+# three market-map queries (run in parallel by geospatial_service) stay well
+# under the frontend's 60s request timeout. Override via env if needed.
+OVERPASS_TIMEOUT_SECONDS = int(os.getenv("OVERPASS_TIMEOUT_SECONDS", "12"))
 CACHE_TTL_SECONDS = 60 * 60 * 6
 # A failed lookup is only cached briefly, so a transient Overpass outage does not
 # blank the map for hours (the previous behavior cached failures for 6h).
@@ -72,6 +76,68 @@ class CompetitorRule:
 
 
 _CACHE: Dict[str, Tuple[float, OSMFetchResult]] = {}
+
+# --- Disk-backed Overpass cache + circuit breaker (Step B: reliability) -------
+# Public Overpass is frequently blocked/throttled (campus networks especially).
+# Successful results are persisted to disk so competitors load instantly, survive
+# restarts, and can be served *stale* when the live API is unreachable — far
+# better than a blank map. Prefetch on a working network with
+# `python -m app.scripts.prefetch_overpass_cache`.
+_DISK_CACHE_PATH = Path(__file__).resolve().parents[1] / "data" / "generated" / "overpass_cache.json"
+DISK_CACHE_MAX_ENTRIES = int(os.getenv("OVERPASS_DISK_CACHE_MAX_ENTRIES", "3000"))
+# Socket timeout per endpoint attempt. MUST be greater than the server-side query
+# budget (OVERPASS_TIMEOUT_SECONDS) or the client hangs up before Overpass can
+# answer — which shows up as "read operation timed out" on queries that would have
+# succeeded. Kept modest so a fully-dead mirror still fails over reasonably fast.
+OVERPASS_HTTP_TIMEOUT_SECONDS = int(os.getenv("OVERPASS_HTTP_TIMEOUT_SECONDS", "16"))
+
+# Circuit breaker: after several consecutive live failures, skip the network for a
+# short cooldown so requests return instantly (from cache) instead of hanging every
+# time. Tuned to tolerate transient blips on a working network (so live address
+# typing keeps working) while still protecting a fully-blocked network.
+_CIRCUIT_FAIL_THRESHOLD = int(os.getenv("OVERPASS_CIRCUIT_FAIL_THRESHOLD", "3"))
+_CIRCUIT_COOLDOWN_SECONDS = int(os.getenv("OVERPASS_CIRCUIT_COOLDOWN_SECONDS", "30"))
+_circuit = {"failures": 0, "open_until": 0.0}
+
+
+def _load_disk_cache() -> None:
+    try:
+        if not _DISK_CACHE_PATH.exists():
+            return
+        raw = json.loads(_DISK_CACHE_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not read Overpass disk cache: %s", exc)
+        return
+    for key, entry in (raw.get("entries") or {}).items():
+        try:
+            _CACHE[key] = (
+                float(entry["cached_at"]),
+                OSMFetchResult(
+                    status=entry.get("status", "live_osm"),
+                    note=entry.get("note", ""),
+                    elements=entry.get("elements", []),
+                ),
+            )
+        except Exception:  # noqa: BLE001
+            continue
+
+
+def _save_disk_cache() -> None:
+    try:
+        _DISK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        # Persist only genuine OSM results (never transient failures), newest first, capped.
+        items = [(key, ts, res) for key, (ts, res) in _CACHE.items() if res.status == "live_osm"]
+        items.sort(key=lambda item: item[1], reverse=True)
+        entries = {
+            key: {"cached_at": ts, "status": res.status, "note": res.note, "elements": res.elements}
+            for key, ts, res in items[:DISK_CACHE_MAX_ENTRIES]
+        }
+        _DISK_CACHE_PATH.write_text(json.dumps({"entries": entries}), encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not write Overpass disk cache: %s", exc)
+
+
+_load_disk_cache()
 
 
 # These terms are intentionally broad. They are used only for text normalization,
@@ -468,21 +534,55 @@ def _query_overpass_endpoint(endpoint: str, query: str) -> List[Dict]:
         headers={"User-Agent": "ZonalyzeCapstone/1.0 (educational prototype)"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=OVERPASS_TIMEOUT_SECONDS + 4) as response:
+    with urllib.request.urlopen(req, timeout=OVERPASS_HTTP_TIMEOUT_SECONDS) as response:
         payload = json.loads(response.read().decode("utf-8"))
     return payload.get("elements", []) or []
 
 
+def _serve_stale(cached_result: OSMFetchResult) -> OSMFetchResult:
+    """Return cached OSM data when the live API is down. It is genuine (older) OSM
+    data, so we keep status='live_osm' to preserve downstream relevance filtering
+    and evidence, and make the note tell the truth."""
+    return OSMFetchResult(
+        status="live_osm",
+        note=(
+            "Live Overpass was unavailable, so Zonalyze is showing the most recent cached "
+            "OpenStreetMap results for this area."
+        ),
+        elements=cached_result.elements,
+    )
+
+
+def _empty_fallback(cache_key: str, now: float, note: str) -> OSMFetchResult:
+    result = OSMFetchResult(status="fallback_proxy", note=note, elements=[])
+    # Cache the failure only briefly so a recovering network is retried soon.
+    _CACHE[cache_key] = (now, result)
+    return result
+
+
 def _fetch_overpass(query: str, cache_key: str) -> OSMFetchResult:
-    cached = _CACHE.get(cache_key)
     now = time.time()
+    cached = _CACHE.get(cache_key)
+    cached_result = cached[1] if cached else None
     if cached:
-        cached_at, cached_result = cached
+        cached_at, _res = cached
         # Successful results are cached for the full TTL; failures only briefly,
         # so a transient Overpass outage cannot blank the map for hours.
         ttl = CACHE_TTL_SECONDS if cached_result.status == "live_osm" else FAILURE_CACHE_TTL_SECONDS
         if now - cached_at < ttl:
             return cached_result
+
+    # Circuit open: the network is known-bad right now. Skip the (slow) live attempt
+    # and serve cached data instantly if we have any, else return immediately.
+    if now < _circuit["open_until"]:
+        if cached_result is not None and cached_result.status == "live_osm":
+            return _serve_stale(cached_result)
+        return _empty_fallback(
+            cache_key,
+            now,
+            "Overpass is being skipped briefly after repeated failures (likely a blocked or throttled "
+            "network). No cached results exist yet for this area — retry once Overpass is reachable.",
+        )
 
     endpoints = _overpass_endpoints()
     errors: List[str] = []
@@ -498,25 +598,36 @@ def _fetch_overpass(query: str, cache_key: str) -> OSMFetchResult:
                 elements=elements,
             )
             _CACHE[cache_key] = (now, result)
+            _circuit["failures"] = 0
+            _circuit["open_until"] = 0.0
+            _save_disk_cache()
             return result
         except Exception as exc:  # rate limit / timeout / network — try next mirror
             errors.append(f"{endpoint.split('//')[-1].split('/')[0]}: {type(exc).__name__}")
             logger.warning("Overpass endpoint failed (%s): %s", endpoint, exc)
             continue
 
-    result = OSMFetchResult(
-        status="fallback_proxy",
-        note=(
-            "Live OpenStreetMap query failed on all endpoints, so the map is using fallback "
-            f"evidence markers. Tried {len(endpoints)} endpoint(s): {'; '.join(errors)}. "
-            "This is usually a temporary Overpass rate-limit or outage — retry shortly."
+    # Every mirror failed. Trip the circuit breaker so we stop hammering a dead
+    # network on every subsequent request.
+    _circuit["failures"] += 1
+    if _circuit["failures"] >= _CIRCUIT_FAIL_THRESHOLD:
+        _circuit["open_until"] = now + _CIRCUIT_COOLDOWN_SECONDS
+
+    # Prefer stale cached OSM data over a blank map — this is the whole point of
+    # the disk cache: once fetched, competitors keep showing when Overpass is down.
+    if cached_result is not None and cached_result.status == "live_osm":
+        return _serve_stale(cached_result)
+
+    return _empty_fallback(
+        cache_key,
+        now,
+        (
+            "Live OpenStreetMap query failed on all endpoints, and no cached results exist yet for "
+            f"this area. Tried {len(endpoints)} endpoint(s): {'; '.join(errors)}. This is usually a "
+            "temporary Overpass rate-limit/outage or a network that blocks it — retry shortly, or run "
+            "the prefetch script on a working network."
         ),
-        elements=[],
     )
-    # Cache the failure only briefly (FAILURE_CACHE_TTL_SECONDS) so the next
-    # request can re-attempt instead of being stuck for 6 hours.
-    _CACHE[cache_key] = (now, result)
-    return result
 
 
 def _normalize_element(element: Dict, center_lat: float, center_lon: float, category: str) -> Dict | None:
