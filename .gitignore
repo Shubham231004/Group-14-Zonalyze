@@ -39,6 +39,10 @@ backend/app/data/
 backend/app/ml/models/
 *.pkl
 
+# OSM extracts for the POI import (hundreds of MB / GB) — never commit; re-download.
+*.pbf
+*.osm.pbf
+
 # --- Track ONLY the small runtime files a fresh clone needs (<200 KB total) ---
 # The large raw data and all *.pkl model weights stay ignored; see DEPLOYMENT.md
 # for how teammates obtain those. The nested rules below re-include specific

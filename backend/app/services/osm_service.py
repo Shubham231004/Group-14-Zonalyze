@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 from app.catalogs.business_subcategories import get_business_profile_dict, get_osm_tags_for_subcategory
+from app.services import poi_query_service
 
 logger = logging.getLogger("zonalyze.osm")
 
@@ -630,6 +631,28 @@ def _fetch_overpass(query: str, cache_key: str) -> OSMFetchResult:
     )
 
 
+def _fetch_pois_or_overpass(
+    query_tags: List[Tuple[str, str]],
+    center_lat: float,
+    center_lon: float,
+    radius_km: float,
+    limit: int,
+    query: str,
+    cache_key: str,
+) -> OSMFetchResult:
+    """Local PostGIS POI store first (owned, no rate limits); Overpass only if the
+    store isn't available yet. Reuses status='live_osm' so downstream relevance
+    filtering/evidence is unchanged (the note states the real source)."""
+    elements = poi_query_service.fetch_pois_from_db(query_tags, center_lat, center_lon, radius_km, limit)
+    if elements is not None:  # store answered (even 0 rows = a real "none nearby")
+        return OSMFetchResult(
+            status="live_osm",
+            note="OpenStreetMap POIs served from Zonalyze's local PostGIS mirror (no live Overpass call).",
+            elements=elements,
+        )
+    return _fetch_overpass(query, cache_key)
+
+
 def _normalize_element(element: Dict, center_lat: float, center_lon: float, category: str) -> Dict | None:
     lat = element.get("lat") or element.get("center", {}).get("lat")
     lon = element.get("lon") or element.get("center", {}).get("lon")
@@ -684,7 +707,7 @@ def fetch_osm_competitors(
 
     query = build_overpass_query(query_tags, center_lat, center_lon, radius_km, limit=max(limit, 80))
     cache_key = f"competitors:v2:{business_subcategory}:{center_lat:.4f}:{center_lon:.4f}:{radius_km}:{limit}"
-    result = _fetch_overpass(query, cache_key)
+    result = _fetch_pois_or_overpass(query_tags, center_lat, center_lon, radius_km, max(limit, 80), query, cache_key)
 
     normalized: List[Dict] = []
     seen = set()
@@ -724,7 +747,7 @@ def fetch_osm_transit(
 ) -> OSMFetchResult:
     query = build_overpass_query(TRANSIT_TAGS, center_lat, center_lon, radius_km, limit=limit)
     cache_key = f"transit:{center_lat:.4f}:{center_lon:.4f}:{radius_km}:{limit}"
-    result = _fetch_overpass(query, cache_key)
+    result = _fetch_pois_or_overpass(TRANSIT_TAGS, center_lat, center_lon, radius_km, limit, query, cache_key)
     normalized: List[Dict] = []
     seen = set()
     for element in result.elements:
@@ -748,7 +771,7 @@ def fetch_osm_commercial_activity(
 ) -> OSMFetchResult:
     query = build_overpass_query(COMMERCIAL_ACTIVITY_TAGS, center_lat, center_lon, radius_km, limit=limit)
     cache_key = f"commercial:{center_lat:.4f}:{center_lon:.4f}:{radius_km}:{limit}"
-    result = _fetch_overpass(query, cache_key)
+    result = _fetch_pois_or_overpass(COMMERCIAL_ACTIVITY_TAGS, center_lat, center_lon, radius_km, limit, query, cache_key)
     normalized: List[Dict] = []
     seen = set()
     for element in result.elements:
