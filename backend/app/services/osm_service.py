@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
+import os
 import re
 import time
 import urllib.parse
@@ -11,10 +13,35 @@ from typing import Dict, Iterable, List, Tuple
 
 from app.catalogs.business_subcategories import get_business_profile_dict, get_osm_tags_for_subcategory
 
+logger = logging.getLogger("zonalyze.osm")
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-OVERPASS_TIMEOUT_SECONDS = 18
+
+# Public Overpass endpoints tried in order. The main de server rate-limits and
+# times out often, so we fall back to community mirrors before giving up.
+# Override/extend via OVERPASS_ENDPOINTS (comma-separated).
+_DEFAULT_OVERPASS_ENDPOINTS = (
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+)
+
+
+def _overpass_endpoints() -> List[str]:
+    raw = os.getenv("OVERPASS_ENDPOINTS", "").strip()
+    if raw:
+        endpoints = [e.strip() for e in raw.split(",") if e.strip()]
+        if endpoints:
+            return endpoints
+    return list(_DEFAULT_OVERPASS_ENDPOINTS)
+
+
+# Kept for backward compatibility (first/primary endpoint).
+OVERPASS_URL = _DEFAULT_OVERPASS_ENDPOINTS[0]
+OVERPASS_TIMEOUT_SECONDS = int(os.getenv("OVERPASS_TIMEOUT_SECONDS", "18"))
 CACHE_TTL_SECONDS = 60 * 60 * 6
+# A failed lookup is only cached briefly, so a transient Overpass outage does not
+# blank the map for hours (the previous behavior cached failures for 6h).
+FAILURE_CACHE_TTL_SECONDS = int(os.getenv("OVERPASS_FAILURE_CACHE_SECONDS", "45"))
 
 
 @dataclass
@@ -429,34 +456,65 @@ out center {limit};
 """.strip()
 
 
+def _query_overpass_endpoint(endpoint: str, query: str) -> List[Dict]:
+    """POST the query to a single Overpass endpoint and return its elements.
+
+    Raises on failure so the caller can try the next mirror.
+    """
+    data = urllib.parse.urlencode({"data": query}).encode("utf-8")
+    req = urllib.request.Request(
+        endpoint,
+        data=data,
+        headers={"User-Agent": "ZonalyzeCapstone/1.0 (educational prototype)"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=OVERPASS_TIMEOUT_SECONDS + 4) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    return payload.get("elements", []) or []
+
+
 def _fetch_overpass(query: str, cache_key: str) -> OSMFetchResult:
     cached = _CACHE.get(cache_key)
     now = time.time()
-    if cached and now - cached[0] < CACHE_TTL_SECONDS:
-        return cached[1]
+    if cached:
+        cached_at, cached_result = cached
+        # Successful results are cached for the full TTL; failures only briefly,
+        # so a transient Overpass outage cannot blank the map for hours.
+        ttl = CACHE_TTL_SECONDS if cached_result.status == "live_osm" else FAILURE_CACHE_TTL_SECONDS
+        if now - cached_at < ttl:
+            return cached_result
 
-    try:
-        data = urllib.parse.urlencode({"data": query}).encode("utf-8")
-        req = urllib.request.Request(
-            OVERPASS_URL,
-            data=data,
-            headers={"User-Agent": "ZonalyzeCapstone/1.0 (educational prototype)"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=OVERPASS_TIMEOUT_SECONDS + 4) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        result = OSMFetchResult(
-            status="live_osm",
-            note="OpenStreetMap data retrieved through the public Overpass API. Competitor results are filtered by Zonalyze relevance scoring before display.",
-            elements=payload.get("elements", []),
-        )
-    except Exception as exc:
-        result = OSMFetchResult(
-            status="fallback_proxy",
-            note=f"Live OpenStreetMap query failed or timed out, so the map is using fallback evidence markers. Details: {type(exc).__name__}",
-            elements=[],
-        )
+    endpoints = _overpass_endpoints()
+    errors: List[str] = []
+    for endpoint in endpoints:
+        try:
+            elements = _query_overpass_endpoint(endpoint, query)
+            result = OSMFetchResult(
+                status="live_osm",
+                note=(
+                    "OpenStreetMap data retrieved through the public Overpass API. "
+                    "Competitor results are filtered by Zonalyze relevance scoring before display."
+                ),
+                elements=elements,
+            )
+            _CACHE[cache_key] = (now, result)
+            return result
+        except Exception as exc:  # rate limit / timeout / network — try next mirror
+            errors.append(f"{endpoint.split('//')[-1].split('/')[0]}: {type(exc).__name__}")
+            logger.warning("Overpass endpoint failed (%s): %s", endpoint, exc)
+            continue
 
+    result = OSMFetchResult(
+        status="fallback_proxy",
+        note=(
+            "Live OpenStreetMap query failed on all endpoints, so the map is using fallback "
+            f"evidence markers. Tried {len(endpoints)} endpoint(s): {'; '.join(errors)}. "
+            "This is usually a temporary Overpass rate-limit or outage — retry shortly."
+        ),
+        elements=[],
+    )
+    # Cache the failure only briefly (FAILURE_CACHE_TTL_SECONDS) so the next
+    # request can re-attempt instead of being stuck for 6 hours.
     _CACHE[cache_key] = (now, result)
     return result
 
