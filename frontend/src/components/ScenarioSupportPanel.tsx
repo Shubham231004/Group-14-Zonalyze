@@ -24,18 +24,18 @@ function badgeClass(status?: string): string {
   const normalized = (status || "").toLowerCase();
 
   if (normalized === "supported") {
-    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700";
   }
 
   if (normalized === "limited_supported" || normalized === "supported_limited" || normalized === "available_not_active") {
-    return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+    return "border-amber-500/40 bg-amber-500/10 text-amber-700";
   }
 
   if (normalized === "needs_review") {
     return "border-red-500/40 bg-red-500/10 text-red-200";
   }
 
-  return "border-slate-700 bg-slate-900 text-slate-300";
+  return "border-border bg-card text-muted-foreground";
 }
 
 function SectionCard({
@@ -52,20 +52,20 @@ function SectionCard({
   nextSteps: string[];
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/70 p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h4 className="text-sm font-semibold text-white">{title}</h4>
+        <h4 className="text-sm font-semibold text-foreground">{title}</h4>
         <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${badgeClass(status)}`}>
           {status.replaceAll("_", " ")}
         </span>
       </div>
-      <p className="mt-2 text-sm text-slate-300">{summary}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{summary}</p>
 
       {reasons.length > 0 && (
-        <ul className="mt-3 space-y-1 text-xs text-slate-400">
+        <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
           {reasons.slice(0, 4).map((reason, index) => (
             <li key={`${title}-reason-${index}`} className="flex gap-2">
-              <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-cyan-300/70" />
+              <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-primary/10" />
               <span>{reason}</span>
             </li>
           ))}
@@ -74,10 +74,10 @@ function SectionCard({
 
       {nextSteps.length > 0 && (
         <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-200">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-700">
             Required before stronger trust
           </p>
-          <ul className="mt-2 space-y-1 text-xs text-amber-100/80">
+          <ul className="mt-2 space-y-1 text-xs text-amber-700/80">
             {nextSteps.slice(0, 3).map((step, index) => (
               <li key={`${title}-step-${index}`}>• {step}</li>
             ))}
@@ -160,17 +160,17 @@ export default function ScenarioSupportPanel({
   ]);
 
   return (
-    <section className={`rounded-2xl border border-white/10 bg-slate-950/70 p-5 shadow-xl ${className}`}>
+    <section className={`rounded-2xl border border-border bg-card p-5 shadow-xl ${className}`}>
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-cyan-300/80">
+          <p className="text-xs uppercase tracking-[0.24em] text-primary">
             Support coverage
           </p>
-          <h3 className="mt-1 text-lg font-semibold text-white">
+          <h3 className="mt-1 text-lg font-semibold text-foreground">
             Scenario trust gate
           </h3>
-          <p className="mt-1 max-w-3xl text-sm text-slate-400">
-            This separates what Zonalyze can safely predict from what it can only use for map/evidence support.
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            This separates what BestSpot can safely predict from what it can only use for map/evidence support.
           </p>
         </div>
 
@@ -187,7 +187,7 @@ export default function ScenarioSupportPanel({
 
       {support && (
         <>
-          <p className="mt-4 text-sm text-slate-300">{support.summary}</p>
+          <p className="mt-4 text-sm text-muted-foreground">{support.summary}</p>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <SectionCard
@@ -208,10 +208,10 @@ export default function ScenarioSupportPanel({
 
           {support.warnings.length > 0 && (
             <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-200">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-700">
                 Warnings
               </p>
-              <ul className="mt-2 space-y-1 text-xs text-amber-100/80">
+              <ul className="mt-2 space-y-1 text-xs text-amber-700/80">
                 {support.warnings.slice(0, 4).map((warning, index) => (
                   <li key={`support-warning-${index}`}>• {warning}</li>
                 ))}
@@ -220,11 +220,11 @@ export default function ScenarioSupportPanel({
           )}
 
           {support.data_trust_notes.length > 0 && (
-            <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-300">
+            <div className="mt-4 rounded-xl border border-border bg-card p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Trust notes
               </p>
-              <ul className="mt-2 space-y-1 text-xs text-slate-400">
+              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                 {support.data_trust_notes.slice(0, 4).map((note, index) => (
                   <li key={`support-note-${index}`}>• {note}</li>
                 ))}

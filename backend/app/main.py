@@ -13,6 +13,7 @@ from app.core.config import (
     CORS_ALLOW_ORIGINS,
     RATE_LIMIT,
     RATE_LIMIT_ENABLED,
+    TRUST_PROXY_HEADERS,
 )
 from app.ml.predictor import ModelsUnavailableError
 from app.services.message_bus_service import register_sensor
@@ -65,26 +66,52 @@ async def add_security_headers(request: Request, call_next):
 
 
 # --- Rate limiting (optional; OFF unless RATE_LIMIT_ENABLED=true) ---
+# In-process fixed-window limiter per client IP. Replaces slowapi, whose global
+# middleware verifiably never enforced with this app's included routers (silent
+# no-op = false security). ~25 lines, and the test suite proves it returns 429.
+# ponytail: fixed window, per-worker counters; move to the gateway/redis if the
+# deploy ever runs many workers and needs exact shared limits.
 if RATE_LIMIT_ENABLED:
-    try:
-        from slowapi import Limiter, _rate_limit_exceeded_handler
-        from slowapi.errors import RateLimitExceeded
-        from slowapi.middleware import SlowAPIMiddleware
-        from slowapi.util import get_remote_address
+    import time as _time
 
-        # application_limits (not default_limits) is what SlowAPIMiddleware enforces
-        # globally per client IP; default_limits only apply to @limiter.limit routes.
-        limiter = Limiter(key_func=get_remote_address, application_limits=[RATE_LIMIT])
-        app.state.limiter = limiter
-        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-        app.add_middleware(SlowAPIMiddleware)
-        logger.info("Rate limiting enabled: %s per client IP.", RATE_LIMIT)
+    _RL_UNITS = {"second": 1, "minute": 60, "hour": 3600}
+    try:
+        _count_raw, _unit_raw = RATE_LIMIT.split("/")
+        _RL_MAX = int(_count_raw)
+        _RL_WINDOW = _RL_UNITS[_unit_raw.strip().lower().rstrip("s")]
     except Exception:
-        logger.warning(
-            "Rate limiting was requested but could not be enabled "
-            "(is slowapi installed? pip install -r requirements.txt).",
-            exc_info=True,
-        )
+        logger.warning("Could not parse RATE_LIMIT=%r; using 240/minute.", RATE_LIMIT)
+        _RL_MAX, _RL_WINDOW = 240, 60
+
+    _rl_hits: dict[str, tuple[float, int]] = {}
+
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        client_ip = request.client.host if request.client else "unknown"
+        if TRUST_PROXY_HEADERS:
+            forwarded = request.headers.get("x-forwarded-for")
+            if forwarded:
+                client_ip = forwarded.split(",")[0].strip() or client_ip
+
+        now = _time.time()
+        window_start, count = _rl_hits.get(client_ip, (now, 0))
+        if now - window_start >= _RL_WINDOW:
+            window_start, count = now, 0
+        count += 1
+        _rl_hits[client_ip] = (window_start, count)
+
+        if len(_rl_hits) > 10_000:  # cheap purge so the table can't grow unbounded
+            for ip in [k for k, v in _rl_hits.items() if now - v[0] >= _RL_WINDOW]:
+                del _rl_hits[ip]
+
+        if count > _RL_MAX:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded. Try again shortly."},
+            )
+        return await call_next(request)
+
+    logger.info("Rate limiting enabled: %s per client IP.", RATE_LIMIT)
 
 
 # --- CORS (added last so it is the outermost middleware) ---

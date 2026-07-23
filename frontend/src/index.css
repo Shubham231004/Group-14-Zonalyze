@@ -3,10 +3,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================
+   BestSpot — "Editorial Cartography" design system
+   Warm paper + ink, the red map pin as the single brand accent.
+   Fraunces (display serif) + Public Sans (UI) + Spline Sans Mono (data).
+   ============================================================ */
+
 @theme inline {
-  --font-sans: 'Inter', sans-serif;
-  --font-display: 'Orbitron', sans-serif;
-  --font-mono: 'Rajdhani', monospace;
+  --font-sans: "Public Sans", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, monospace;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -39,58 +45,41 @@
 }
 
 :root {
-  --background: 230 40% 98%;
-  --foreground: 230 40% 6%;
-  --card: 0 0% 100%;
-  --card-foreground: 230 40% 6%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 230 40% 6%;
-  --primary: 199 89% 48%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 217 32% 90%;
-  --secondary-foreground: 230 40% 6%;
-  --muted: 217 32% 90%;
-  --muted-foreground: 215 20.2% 45%;
-  --accent: 43 96% 56%;
-  --accent-foreground: 230 40% 6%;
-  --destructive: 348 83% 47%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 217 32% 90%;
-  --input: 217 32% 90%;
-  --ring: 199 89% 48%;
-  --radius: 0.5rem;
-  --chart-1: 199 89% 48%;
-  --chart-2: 43 96% 56%;
-  --chart-3: 160 84% 39%;
-  --chart-4: 280 65% 60%;
-  --chart-5: 348 83% 47%;
-}
+  /* Warm paper + ink */
+  --background: 40 33% 97%;
+  --foreground: 24 14% 13%;
+  --card: 40 40% 99%;
+  --card-foreground: 24 14% 13%;
+  --popover: 40 40% 99%;
+  --popover-foreground: 24 14% 13%;
 
-.dark {
-  --background: 230 30% 6%;
-  --foreground: 210 40% 98%;
-  --card: 222 40% 10%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222 40% 10%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 199 89% 48%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 217 32% 17%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217 32% 17%;
-  --muted-foreground: 215 20.2% 65%;
-  --accent: 43 96% 56%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 348 83% 47%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 217 32% 17%;
-  --input: 217 32% 17%;
-  --ring: 199 89% 48%;
-  --chart-1: 199 89% 48%;
-  --chart-2: 43 96% 56%;
-  --chart-3: 160 84% 39%;
-  --chart-4: 280 65% 60%;
-  --chart-5: 348 83% 47%;
+  /* The pin. Same red the map drops on competitors. */
+  --primary: 4 71% 50%;
+  --primary-foreground: 40 40% 99%;
+
+  --secondary: 36 26% 92%;
+  --secondary-foreground: 24 14% 13%;
+  --muted: 36 24% 93%;
+  --muted-foreground: 26 9% 42%;
+
+  /* Viability green — used sparingly for good verdicts */
+  --accent: 152 40% 32%;
+  --accent-foreground: 40 40% 99%;
+
+  --destructive: 355 68% 42%;
+  --destructive-foreground: 40 40% 99%;
+
+  --border: 33 20% 87%;
+  --input: 33 20% 85%;
+  --ring: 4 71% 50%;
+  --radius: 0.75rem;
+
+  /* Warm categorical charts: pin red, viability green, amber, ink blue, clay */
+  --chart-1: 4 71% 50%;
+  --chart-2: 152 40% 36%;
+  --chart-3: 38 85% 52%;
+  --chart-4: 215 35% 40%;
+  --chart-5: 20 45% 45%;
 }
 
 @layer base {
@@ -99,59 +88,97 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    background-image: 
-      radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+    /* Subtle cartographic dot grid — the paper feels like a map sheet. */
+    background-image: radial-gradient(hsl(24 14% 13% / 0.045) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  h1, h2, h3 {
+    @apply font-display;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.16);
   }
 }
 
+/* ------------------------------------------------------------
+   Legacy utility classes, redefined into the new language so the
+   existing app inherits the redesign without a full JSX rewrite.
+   ------------------------------------------------------------ */
+
+/* Was: dark glassy SCADA panel with cyan glow. Now: warm paper card. */
 .scada-panel {
-  @apply relative overflow-hidden bg-card/60 backdrop-blur-md border border-white/5;
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  @apply relative overflow-hidden bg-card border border-border rounded-2xl;
+  box-shadow:
+    0 1px 2px hsl(24 14% 13% / 0.05),
+    0 6px 24px -8px hsl(24 14% 13% / 0.09);
 }
 
-.scada-panel::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.3), transparent);
-}
-
+/* Was: sci-fi scanline animation across the screen. Gone. */
 .scanline {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: rgba(6, 182, 212, 0.1);
-  opacity: 0.4;
-  animation: scanline 8s linear infinite;
-  pointer-events: none;
-  z-index: 50;
+  display: none;
 }
 
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-
-.data-value {
-  @apply font-mono font-bold tracking-tight;
-  text-shadow: 0 0 10px rgba(var(--primary), 0.5);
-}
-
-.data-value-accent {
-  @apply font-mono font-bold tracking-tight text-accent;
-  text-shadow: 0 0 10px rgba(var(--accent), 0.5);
-}
-
-.data-value-destructive {
-  @apply font-mono font-bold tracking-tight text-destructive;
-  text-shadow: 0 0 10px rgba(var(--destructive), 0.5);
-}
-
+/* Was: Rajdhani LCD lettering. Now: quiet humanist label. */
 .lcd-text {
-  font-family: 'Rajdhani', monospace;
+  font-family: "Public Sans", system-ui, sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  font-size: 0.92em;
+}
+
+/* Data figures: tabular mono, no glow. */
+.data-value {
+  @apply font-mono font-semibold tracking-tight;
+  font-variant-numeric: tabular-nums;
+}
+.data-value-accent {
+  @apply font-mono font-semibold tracking-tight text-accent;
+  font-variant-numeric: tabular-nums;
+}
+.data-value-destructive {
+  @apply font-mono font-semibold tracking-tight text-destructive;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   BestSpot brand touches
+   ------------------------------------------------------------ */
+
+/* The brand pin — a red map pin drawn in pure CSS, usable at any size via em. */
+.brand-pin {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  background: hsl(var(--primary));
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg) translateY(-0.06em);
+  position: relative;
+}
+.brand-pin::after {
+  content: "";
+  position: absolute;
+  inset: 27%;
+  background: hsl(var(--card));
+  border-radius: 50%;
+}
+
+/* Gentle rise-in for landing sections */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise-in {
+  animation: rise-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Pin drop for the hero mark */
+@keyframes pin-drop {
+  0% { opacity: 0; transform: rotate(-45deg) translate(0.35em, -0.35em); }
+  60% { opacity: 1; transform: rotate(-45deg) translate(-0.05em, 0.05em); }
+  100% { opacity: 1; transform: rotate(-45deg) translateY(-0.06em); }
+}
+.pin-drop {
+  animation: pin-drop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.35s both;
 }

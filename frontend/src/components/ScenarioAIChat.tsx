@@ -167,16 +167,16 @@ export default function ScenarioAIChat({
   const healthWarnings = aiStatus?.warnings ?? [];
 
   return (
-    <Card className="scada-panel border-white/5 overflow-hidden">
-      <CardHeader className="border-b border-white/10 pb-4">
+    <Card className="scada-panel border-border overflow-hidden">
+      <CardHeader className="border-b border-border pb-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2 text-white/90">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <BrainCircuit className="h-5 w-5 text-primary" />
-              Ask Zonalyze AI
+              Ask BestSpot AI
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Ask follow-up questions about {scenarioLabel}. Answers use Zonalyze scenario data, evidence, credibility, and recommendations.
+              Ask follow-up questions about {scenarioLabel}. Answers use BestSpot scenario data, evidence, credibility, and recommendations.
             </p>
           </div>
 
@@ -185,17 +185,17 @@ export default function ScenarioAIChat({
               variant="outline"
               className={
                 isReady
-                  ? "border-emerald-400/30 text-emerald-300"
+                  ? "border-emerald-400/30 text-emerald-700"
                   : "border-accent/30 text-accent"
               }
             >
               AI {statusLabel}
             </Badge>
-            <Badge variant="outline" className="border-white/15 text-white/60">
+            <Badge variant="outline" className="border-border text-muted-foreground">
               {modelLabel}
             </Badge>
             {ollamaVersion && (
-              <Badge variant="outline" className="border-white/15 text-white/60">
+              <Badge variant="outline" className="border-border text-muted-foreground">
                 Ollama {ollamaVersion}
               </Badge>
             )}
@@ -205,7 +205,7 @@ export default function ScenarioAIChat({
                 title={aiStatus.structured_outputs_note ?? undefined}
                 className={
                   structuredOutputs
-                    ? "border-emerald-400/30 text-emerald-300"
+                    ? "border-emerald-400/30 text-emerald-700"
                     : "border-accent/30 text-accent"
                 }
               >
@@ -237,7 +237,7 @@ export default function ScenarioAIChat({
               type="button"
               variant="outline"
               size="sm"
-              className="justify-start border-white/10 bg-white/[0.03] text-left text-[11px] text-white/75 hover:bg-primary/10"
+              className="justify-start border-border bg-white/[0.03] text-left text-[11px] text-muted-foreground hover:bg-primary/10"
               onClick={() => askQuestion(item)}
               disabled={isAsking}
             >
@@ -252,7 +252,7 @@ export default function ScenarioAIChat({
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             placeholder="Ask a question about this scenario..."
-            className="min-h-[86px] flex-1 resize-none rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none ring-0 placeholder:text-white/35 focus:border-primary/50"
+            className="min-h-[86px] flex-1 resize-none rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none ring-0 placeholder:text-muted-foreground focus:border-primary/50"
           />
           <Button
             type="button"
@@ -281,19 +281,19 @@ export default function ScenarioAIChat({
             <p className="text-xs font-mono uppercase tracking-widest text-primary/80">
               AI response
             </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/85">
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">
               {answer.answer}
             </p>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {usedSignals.length > 0 && (
                 <div>
-                  <p className="text-[11px] font-mono uppercase tracking-widest text-white/35">
+                  <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
                     Used signals
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {usedSignals.slice(0, 8).map((signal) => (
-                      <Badge key={signal} variant="outline" className="border-white/10 text-white/60">
+                      <Badge key={signal} variant="outline" className="border-border text-muted-foreground">
                         {signal}
                       </Badge>
                     ))}
@@ -303,10 +303,10 @@ export default function ScenarioAIChat({
 
               {limitations.length > 0 && (
                 <div>
-                  <p className="text-[11px] font-mono uppercase tracking-widest text-white/35">
+                  <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
                     Limitations
                   </p>
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-white/60">
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
                     {limitations.slice(0, 3).map((item) => (
                       <li key={item}>{item}</li>
                     ))}

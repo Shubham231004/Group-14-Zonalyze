@@ -61,9 +61,15 @@ CORS_ALLOW_ORIGINS = [
 
 # --- Rate limiting ---
 # OFF by default (best tuned against real traffic / at the gateway before a
-# public launch). Set RATE_LIMIT_ENABLED=true to activate; RATE_LIMIT uses
-# slowapi syntax and applies per client IP, per endpoint.
+# public launch). Set RATE_LIMIT_ENABLED=true to activate; RATE_LIMIT is
+# "N/second|minute|hour" and applies globally per client IP.
 RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "false").strip().lower() in {
     "1", "true", "yes", "on",
 }
 RATE_LIMIT = os.getenv("RATE_LIMIT", "240/minute").strip()
+# Only trust X-Forwarded-For when the app runs behind OUR OWN reverse proxy
+# (cloud deploy). If trusted while directly exposed, clients could spoof their
+# IP and dodge the limiter.
+TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() in {
+    "1", "true", "yes", "on",
+}

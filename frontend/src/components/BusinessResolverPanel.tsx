@@ -25,30 +25,30 @@ function confidenceBadgeClass(confidence?: string): string {
   const normalized = (confidence || "").toLowerCase();
 
   if (normalized === "high") {
-    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700";
   }
 
   if (normalized === "medium") {
-    return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+    return "border-amber-500/40 bg-amber-500/10 text-amber-700";
   }
 
   if (normalized === "low" || normalized === "unresolved") {
     return "border-red-500/40 bg-red-500/10 text-red-200";
   }
 
-  return "border-slate-600 bg-slate-900 text-slate-300";
+  return "border-slate-600 bg-card text-muted-foreground";
 }
 
 function statusBadgeClass(status?: string): string {
   if (status === "resolved") {
-    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700";
   }
 
   if (status === "needs_review") {
-    return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+    return "border-amber-500/40 bg-amber-500/10 text-amber-700";
   }
 
-  return "border-slate-600 bg-slate-900 text-slate-300";
+  return "border-slate-600 bg-card text-muted-foreground";
 }
 
 function formatScore(score?: number): string {
@@ -130,22 +130,22 @@ export default function BusinessResolverPanel({
   }
 
   return (
-    <section className={`rounded-2xl border border-white/10 bg-slate-950/70 p-5 shadow-xl ${className}`}>
+    <section className={`rounded-2xl border border-border bg-card p-5 shadow-xl ${className}`}>
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-cyan-300/80">
+          <p className="text-xs uppercase tracking-[0.24em] text-primary">
             Business interpretation
           </p>
-          <h3 className="mt-1 text-lg font-semibold text-white">
+          <h3 className="mt-1 text-lg font-semibold text-foreground">
             User-governed business input
           </h3>
-          <p className="mt-1 max-w-3xl text-sm text-slate-400">
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Choose a known catalog business for the existing ML prediction flow, or enter a custom
-            business idea so Zonalyze can resolve OSM tags for map and competitor evidence.
+            business idea so BestSpot can resolve OSM tags for map and competitor evidence.
           </p>
         </div>
 
-        <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-300">
+        <div className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
           {municipalityName} · {radiusKm} km
         </div>
       </div>
@@ -156,16 +156,16 @@ export default function BusinessResolverPanel({
           onClick={() => switchMode("catalog")}
           className={`rounded-xl border p-4 text-left transition ${
             businessInputMode === "catalog"
-              ? "border-cyan-400/60 bg-cyan-500/10"
-              : "border-slate-700 bg-slate-900/60 hover:border-slate-500"
+              ? "border-primary/40 bg-primary/10"
+              : "border-border bg-card hover:border-slate-500"
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold text-white">Known catalog business</span>
-            <span className="text-xs text-slate-400">Current ML-safe mode</span>
+            <span className="text-sm font-semibold text-foreground">Known catalog business</span>
+            <span className="text-xs text-muted-foreground">Current ML-safe mode</span>
           </div>
-          <p className="mt-2 text-sm text-slate-300">{currentCatalogBusinessSubcategory}</p>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-sm text-muted-foreground">{currentCatalogBusinessSubcategory}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
             Uses the existing business catalog assumptions and current prediction pipeline.
           </p>
         </button>
@@ -175,19 +175,19 @@ export default function BusinessResolverPanel({
           onClick={() => switchMode("custom")}
           className={`rounded-xl border p-4 text-left transition ${
             businessInputMode === "custom"
-              ? "border-cyan-400/60 bg-cyan-500/10"
-              : "border-slate-700 bg-slate-900/60 hover:border-slate-500"
+              ? "border-primary/40 bg-primary/10"
+              : "border-border bg-card hover:border-slate-500"
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold text-white">Custom business idea</span>
-            <span className="text-xs text-slate-400">Dynamic OSM evidence</span>
+            <span className="text-sm font-semibold text-foreground">Custom business idea</span>
+            <span className="text-xs text-muted-foreground">Dynamic OSM evidence</span>
           </div>
-          <p className="mt-2 text-sm text-slate-300">
+          <p className="mt-2 text-sm text-muted-foreground">
             Type any specific or niche idea and let local AI resolve OSM tags.
           </p>
-          <p className="mt-2 text-xs text-slate-500">
-            No hardcoded category fallback is used. If AI cannot resolve it, Zonalyze asks for review.
+          <p className="mt-2 text-xs text-muted-foreground">
+            No hardcoded category fallback is used. If AI cannot resolve it, BestSpot asks for review.
           </p>
         </button>
       </div>
@@ -195,7 +195,7 @@ export default function BusinessResolverPanel({
       {businessInputMode === "custom" ? (
         <div className="mt-5 space-y-4">
           <div>
-            <label className="text-sm font-medium text-slate-200" htmlFor="custom-business-query">
+            <label className="text-sm font-medium text-foreground" htmlFor="custom-business-query">
               Describe the business idea
             </label>
             <div className="mt-2 flex flex-col gap-3 md:flex-row">
@@ -211,18 +211,18 @@ export default function BusinessResolverPanel({
                   onUseCustomBusinessForMapChange(false);
                 }}
                 placeholder="Example: Esso gas station with Circle K convenience store"
-                className="min-h-11 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
+                className="min-h-11 flex-1 rounded-xl border border-border bg-card px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary"
               />
               <button
                 type="button"
                 onClick={resolveBusinessIdea}
                 disabled={!canResolve}
-                className="rounded-xl border border-cyan-400/50 bg-cyan-500/15 px-5 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+                className="rounded-xl border border-primary/40 bg-primary/10 px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-card disabled:text-muted-foreground"
               >
                 {isResolving ? "Resolving..." : "Resolve business"}
               </button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-muted-foreground">
               The resolver calls the backend <code>/business/resolve</code> endpoint and uses local AI
               structured output when available. The ML prediction still uses the selected catalog
               business until custom financial assumptions are added.
@@ -236,13 +236,13 @@ export default function BusinessResolverPanel({
           ) : null}
 
           {resolution ? (
-            <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-4">
+            <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                    Zonalyze interpretation
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    BestSpot interpretation
                   </p>
-                  <h4 className="mt-1 text-base font-semibold text-white">{resolvedSummary}</h4>
+                  <h4 className="mt-1 text-base font-semibold text-foreground">{resolvedSummary}</h4>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -256,7 +256,7 @@ export default function BusinessResolverPanel({
                   >
                     {resolution.resolution_confidence || "unknown"} · {formatScore(resolution.confidence_score)}
                   </span>
-                  <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-300">
+                  <span className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
                     {resolution.raw_ai_available ? "Ollama resolved" : "AI unavailable"}
                   </span>
                 </div>
@@ -264,33 +264,33 @@ export default function BusinessResolverPanel({
 
               <div className="mt-4 grid gap-4 md:grid-cols-3">
                 <div>
-                  <p className="text-xs text-slate-500">Brand terms</p>
-                  <p className="mt-1 text-sm text-slate-300">
+                  <p className="text-xs text-muted-foreground">Brand terms</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {(resolution.brand_terms || []).length ? resolution.brand_terms?.join(", ") : "None detected"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Specialty terms</p>
-                  <p className="mt-1 text-sm text-slate-300">
+                  <p className="text-xs text-muted-foreground">Specialty terms</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {(resolution.specialty_terms || []).length
                       ? resolution.specialty_terms?.join(", ")
                       : "None detected"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Source method</p>
-                  <p className="mt-1 text-sm text-slate-300">{resolution.source_method || "unknown"}</p>
+                  <p className="text-xs text-muted-foreground">Source method</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{resolution.source_method || "unknown"}</p>
                 </div>
               </div>
 
               <div className="mt-4">
-                <p className="text-xs text-slate-500">Validated OSM tags</p>
+                <p className="text-xs text-muted-foreground">Validated OSM tags</p>
                 {(resolution.osm_tags || []).length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {resolution.osm_tags?.map((tag, index) => (
                       <span
                         key={`${tag.key}-${tag.value}-${index}`}
-                        className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100"
+                        className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-primary"
                         title={tag.reason || undefined}
                       >
                         {tag.key}={tag.value} · {Math.round(tag.confidence * 100)}% · {tag.tag_role}
@@ -298,7 +298,7 @@ export default function BusinessResolverPanel({
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-1 text-sm text-amber-200">
+                  <p className="mt-1 text-sm text-amber-700">
                     No validated OSM tags were returned. Map evidence should not use this custom business yet.
                   </p>
                 )}
@@ -306,10 +306,10 @@ export default function BusinessResolverPanel({
 
               {(resolution.warnings || []).length ? (
                 <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
                     Warnings
                   </p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-100">
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-700">
                     {resolution.warnings?.map((warning, index) => (
                       <li key={`${warning}-${index}`}>{warning}</li>
                     ))}
@@ -317,7 +317,7 @@ export default function BusinessResolverPanel({
                 </div>
               ) : null}
 
-              <label className="mt-4 flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-950/70 p-3 text-sm text-slate-300">
+              <label className="mt-4 flex items-start gap-3 rounded-xl border border-border bg-card p-3 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={useCustomBusinessForMap && canUseForMap}
@@ -326,7 +326,7 @@ export default function BusinessResolverPanel({
                   className="mt-1"
                 />
                 <span>
-                  <span className="font-semibold text-white">Use this interpretation for map evidence</span>
+                  <span className="font-semibold text-foreground">Use this interpretation for map evidence</span>
                   <br />
                   The map will call <code>/geo/market-map</code> with <code>business_query</code> so
                   validated AI-generated OSM tags can drive competitor/POI lookup. The ML prediction

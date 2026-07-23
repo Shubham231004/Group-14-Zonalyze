@@ -248,41 +248,41 @@ function FootfallLegend({ geoContext }: { geoContext: GeospatialMarketContext })
     : [];
 
   return (
-    <div className="pointer-events-none absolute bottom-4 right-4 z-[5] w-[245px] rounded-xl border border-white/15 bg-slate-950/82 p-3 shadow-xl backdrop-blur-md">
+    <div className="pointer-events-none absolute bottom-4 right-4 z-[5] w-[245px] rounded-xl border border-border bg-card p-3 shadow-xl backdrop-blur-md">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/80">Footfall evidence</p>
-          <p className="mt-0.5 text-[10px] text-white/45">Public activity-signal density</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-foreground">Footfall evidence</p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">Public activity-signal density</p>
         </div>
-        <span className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-mono uppercase text-white/65">
+        <span className="rounded-full border border-border px-2 py-0.5 text-[9px] font-mono uppercase text-muted-foreground">
           {points.length} pts
         </span>
       </div>
 
-      <div className="mt-3 h-3 rounded-full border border-white/20 bg-[linear-gradient(90deg,#5eead4_0%,#fde68a_42%,#fbbf24_70%,#fb7185_100%)] shadow-[0_0_12px_rgba(251,191,36,.18)]" />
-      <div className="mt-1 flex justify-between text-[9px] font-mono uppercase text-white/55">
+      <div className="mt-3 h-3 rounded-full border border-border bg-[linear-gradient(90deg,#5eead4_0%,#fde68a_42%,#fbbf24_70%,#fb7185_100%)] shadow-[0_0_12px_rgba(251,191,36,.18)]" />
+      <div className="mt-1 flex justify-between text-[9px] font-mono uppercase text-muted-foreground">
         <span>Lower</span>
         <span>Medium</span>
         <span>Higher</span>
       </div>
 
-      <div className="mt-2 grid grid-cols-4 gap-1 text-[9px] font-mono uppercase text-white/70">
-        <span className="rounded bg-teal-300/18 px-1.5 py-1 text-center text-teal-100">Low</span>
-        <span className="rounded bg-amber-100/18 px-1.5 py-1 text-center text-amber-50">Med</span>
-        <span className="rounded bg-amber-400/18 px-1.5 py-1 text-center text-amber-100">High</span>
-        <span className="rounded bg-rose-300/18 px-1.5 py-1 text-center text-rose-100">Peak</span>
+      <div className="mt-2 grid grid-cols-4 gap-1 text-[9px] font-mono uppercase text-muted-foreground">
+        <span className="rounded bg-teal-300/18 px-1.5 py-1 text-center text-teal-700">Low</span>
+        <span className="rounded bg-amber-100/18 px-1.5 py-1 text-center text-amber-800">Med</span>
+        <span className="rounded bg-amber-400/18 px-1.5 py-1 text-center text-amber-700">High</span>
+        <span className="rounded bg-rose-300/18 px-1.5 py-1 text-center text-rose-700">Peak</span>
       </div>
 
-      <p className="mt-2 text-[10px] leading-snug text-white/50">
+      <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
         {points.length
           ? "Heat is generated from real public map evidence such as business POIs, transit points, and commercial activity clusters."
           : "No footfall evidence points were returned for this scenario."}
       </p>
 
       {sources.length ? (
-        <p className="mt-1 truncate text-[9px] text-white/35">Sources: {sources.slice(0, 3).join(", ")}</p>
+        <p className="mt-1 truncate text-[9px] text-muted-foreground">Sources: {sources.slice(0, 3).join(", ")}</p>
       ) : null}
-      <p className="mt-1 text-[9px] text-white/35">Status: {String(status).replaceAll("_", " ")}</p>
+      <p className="mt-1 text-[9px] text-muted-foreground">Status: {String(status).replaceAll("_", " ")}</p>
     </div>
   );
 }
@@ -452,13 +452,13 @@ function FitLeafletToRadius({ center, radiusKm }: { center: [number, number]; ra
 
 function MapHeader({ geoContext, radiusKm, mode }: { geoContext: GeospatialMarketContext; radiusKm: number; mode: "mapbox" | "openstreetmap" }) {
   return (
-    <div className="flex flex-col gap-2 border-b border-white/10 px-5 py-4 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-2 border-b border-border px-5 py-4 md:flex-row md:items-center md:justify-between">
       <div>
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.8)]" />
-          <h3 className="text-sm font-semibold tracking-wide text-white/90">Market Map</h3>
+          <h3 className="text-sm font-semibold tracking-wide text-foreground">Market Map</h3>
         </div>
-        <p className="mt-1 text-[11px] font-mono text-white/50">
+        <p className="mt-1 text-[11px] font-mono text-muted-foreground">
           {geoContext.municipality_name} · {geoContext.business_subcategory} · {radiusKm} km radius
         </p>
       </div>
@@ -477,18 +477,18 @@ function MapHeader({ geoContext, radiusKm, mode }: { geoContext: GeospatialMarke
 
 function MapFooter({ geoContext, radiusKm, markerCount, mode }: { geoContext: GeospatialMarketContext; radiusKm: number; markerCount: number; mode: "mapbox" | "openstreetmap" }) {
   return (
-    <div className="grid gap-3 border-t border-white/10 px-5 py-4 text-[11px] text-white/55 md:grid-cols-3">
+    <div className="grid gap-3 border-t border-border px-5 py-4 text-[11px] text-muted-foreground md:grid-cols-3">
       <div>
-        <p className="font-mono uppercase tracking-widest text-white/35">Coverage</p>
-        <p className="mt-1 text-white/70">{geoContext.radius_label ?? `${radiusKm} km analysis radius`}</p>
+        <p className="font-mono uppercase tracking-widest text-muted-foreground">Coverage</p>
+        <p className="mt-1 text-muted-foreground">{geoContext.radius_label ?? `${radiusKm} km analysis radius`}</p>
       </div>
       <div>
-        <p className="font-mono uppercase tracking-widest text-white/35">Evidence</p>
-        <p className="mt-1 text-white/70">{markerCount} map evidence marker(s)</p>
+        <p className="font-mono uppercase tracking-widest text-muted-foreground">Evidence</p>
+        <p className="mt-1 text-muted-foreground">{markerCount} map evidence marker(s)</p>
       </div>
       <div>
-        <p className="font-mono uppercase tracking-widest text-white/35">Map source</p>
-        <p className="mt-1 text-white/70">
+        <p className="font-mono uppercase tracking-widest text-muted-foreground">Map source</p>
+        <p className="mt-1 text-muted-foreground">
           {mode === "mapbox"
             ? "Mapbox GL JS. Uses your free-tier public token."
             : "OpenStreetMap/CARTO tiles, free for demo use."}
@@ -511,7 +511,7 @@ function MapboxRenderer({ geoContext, center, radiusKm, markers }: { geoContext:
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
-      style: "mapbox://styles/mapbox/streets-v12",
+      style: "mapbox://styles/mapbox/light-v11",
       center: [center[1], center[0]],
       zoom: 12,
       pitch: 0,
@@ -724,7 +724,7 @@ function MapboxRenderer({ geoContext, center, radiusKm, markers }: { geoContext:
   }, [mapboxToken, center[0], center[1], radiusKm, geoContext, markers]);
 
   return (
-    <div className="relative h-[460px] w-full bg-slate-900">
+    <div className="relative h-[460px] w-full bg-card">
       <div ref={mapContainerRef} className="h-full w-full" />
       <FootfallLegend geoContext={geoContext} />
     </div>
@@ -736,7 +736,7 @@ function LeafletRenderer({ geoContext, center, radiusKm, markers }: { geoContext
   const footfallPoints = normalizeFootfallPoints(geoContext);
 
   return (
-    <div className="relative h-[460px] w-full bg-slate-900">
+    <div className="relative h-[460px] w-full bg-card">
       <MapContainer
         key={mapKey}
         center={center}
@@ -825,7 +825,7 @@ export default function MarketMap({ geoContext, className = "" }: Props) {
   const mode = hasMapboxToken ? "mapbox" : "openstreetmap";
 
   return (
-    <div className={`overflow-hidden rounded-lg border bg-slate-950 ${className}`}>
+    <div className={`overflow-hidden rounded-lg border bg-card ${className}`}>
       <MapHeader geoContext={geoContext} radiusKm={radiusKm} mode={mode} />
 
       {hasMapboxToken ? (

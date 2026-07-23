@@ -62,6 +62,7 @@ import { useToast } from "@/hooks/use-toast";
 import MarketMap from "@/components/MarketMap";
 import ScenarioAIChat from "@/components/ScenarioAIChat";
 import ScenarioSupportPanel from "@/components/ScenarioSupportPanel";
+import AccountButton from "@/components/AccountButton";
 import BusinessResolverPanel, {
   type BusinessInputMode,
 } from "@/components/BusinessResolverPanel";
@@ -121,26 +122,26 @@ function indicatorLabelForRisk(indicator: string) {
 }
 
 function indicatorTextClass(indicator: string) {
-  if (indicator === "green") return "text-emerald-400";
+  if (indicator === "green") return "text-emerald-600";
   if (indicator === "yellow") return "text-accent";
   if (indicator === "red") return "text-destructive";
-  return "text-white";
+  return "text-foreground";
 }
 
 function indicatorBadgeClass(indicator: string) {
-  if (indicator === "green") return "text-emerald-400 border-emerald-400/30 bg-emerald-500/5";
+  if (indicator === "green") return "text-emerald-600 border-emerald-400/30 bg-emerald-500/5";
   if (indicator === "yellow") return "text-accent border-accent/30 bg-accent/5";
   if (indicator === "red") return "text-destructive border-destructive/30 bg-destructive/5";
-  return "text-white border-white/20";
+  return "text-foreground border-border";
 }
 
 function recommendationBadgeClass(recommendation?: string) {
   if (recommendation === "recommended")
-    return "text-emerald-400 border-emerald-400/30 bg-emerald-500/5";
+    return "text-emerald-600 border-emerald-400/30 bg-emerald-500/5";
   if (recommendation === "borderline") return "text-accent border-accent/30 bg-accent/5";
   if (recommendation === "not_recommended")
     return "text-destructive border-destructive/30 bg-destructive/5";
-  return "text-white border-white/20";
+  return "text-foreground border-border";
 }
 
 function getMetric(data: DashboardSummaryResponse | null, key: string) {
@@ -202,7 +203,7 @@ function formatPercent(value?: number | null) {
 }
 
 function credibilityClass(level?: string) {
-  if (level === "strong") return "text-emerald-400 border-emerald-400/30 bg-emerald-500/5";
+  if (level === "strong") return "text-emerald-600 border-emerald-400/30 bg-emerald-500/5";
   if (level === "moderate") return "text-primary border-primary/30 bg-primary/5";
   if (level === "limited") return "text-accent border-accent/30 bg-accent/5";
   return "text-destructive border-destructive/30 bg-destructive/5";
@@ -226,7 +227,7 @@ function MarketMapPanel({
 }) {
   if (!geoContext) {
     return (
-      <Card className="scada-panel border-white/5">
+      <Card className="scada-panel border-border">
         <CardContent className="p-8 flex flex-col items-center justify-center min-h-[400px]">
           {error && !isLoading ? (
             <>
@@ -255,7 +256,7 @@ function MarketMapPanel({
   return (
     <MarketMap
       geoContext={geoContext}
-      className="scada-panel border-white/5 shadow-2xl rounded-2xl overflow-hidden min-h-[500px]"
+      className="scada-panel border-border shadow-2xl rounded-2xl overflow-hidden min-h-[500px]"
     />
   );
 }
@@ -309,7 +310,7 @@ export default function Dashboard() {
 
   // Redesign & loader state managers
   const [isScenarioSelected, setIsScenarioSelected] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "map" | "evidence" | "benchmarks" | "history">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "map" | "evidence" | "benchmarks" | "history">("map");
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Simulated Loader Progress States
@@ -614,6 +615,18 @@ export default function Dashboard() {
       setDashboardData(response);
       setLastUpdate(new Date());
 
+      // Every completed search lands in the signed-in user's history (fire and
+      // forget — a failed save must never break the analysis), so returning
+      // users see what they've already checked.
+      saveScenarioToHistory({
+        municipality_name: municipalityName,
+        business_subcategory: businessSubcategory,
+        radius_km: radius[0],
+      })
+        .then(() => fetchScenarioHistory())
+        .then((history) => setScenarioHistory(history?.scenarios ?? []))
+        .catch(() => {});
+
       // Map/competitors — bounded so a slow or rate-limited Overpass can't stall the
       // whole screen. If it isn't ready in time, the workspace still opens and the
       // map finishes (or shows its honest retry state) on its own.
@@ -635,6 +648,7 @@ export default function Dashboard() {
       window.clearInterval(interval);
       setLoadingProgress(100);
       setLoadingStep("Ready.");
+      setActiveTab("map"); // land on the map — the competitors ARE the excitement
       setIsScenarioSelected(true);
       setIsAnalyzing(false);
     }
@@ -797,10 +811,10 @@ export default function Dashboard() {
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center relative overflow-hidden">
         <div className="scanline" />
         <div className="scada-panel px-8 py-6 rounded-2xl flex flex-col items-center gap-4 max-w-sm text-center">
-          <BrainCircuit className="w-12 h-12 text-primary animate-pulse" />
+          <span className="brand-pin text-5xl" aria-hidden />
           <div>
-            <h3 className="font-display font-bold text-white text-lg tracking-wider">ZONALYZE CORE</h3>
-            <p className="lcd-text text-[11px] text-primary mt-1">Initializing ML Prediction Models...</p>
+            <h3 className="font-display font-semibold text-foreground text-xl">BestSpot</h3>
+            <p className="text-xs text-muted-foreground mt-1">Loading your market data…</p>
           </div>
         </div>
       </div>
@@ -815,37 +829,40 @@ export default function Dashboard() {
         <div className="absolute top-10 left-10 w-72 h-72 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
 
-        <Card className="scada-panel border-white/10 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-6">
-          <img src="/logo.jpg" className="w-48 mx-auto rounded-2xl border border-white/15 shadow-xl shadow-primary/5" alt="Logo" />
-          
+        <Card className="scada-panel border-border rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-6">
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <span className="brand-pin text-4xl pin-drop" aria-hidden />
+            <span className="font-display text-3xl font-semibold text-foreground">BestSpot</span>
+          </div>
+
           <div className="space-y-2">
-            <h3 className="text-lg font-display text-white tracking-wider uppercase">Analyzing Feasibility</h3>
-            <p className="text-xs text-slate-400">Running advanced geospatial and ML algorithms</p>
+            <h3 className="text-lg font-display text-foreground">Checking your spot…</h3>
+            <p className="text-xs text-muted-foreground">Mapping competitors, counting customers, running the numbers.</p>
           </div>
 
           <div className="space-y-3 pt-2">
-            <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden border border-white/5 p-0.5">
+            <div className="w-full h-3 rounded-full bg-muted overflow-hidden border border-border p-0.5">
               <div
-                className="h-full bg-gradient-to-r from-primary to-cyan-400 rounded-full transition-all duration-100 ease-out"
+                className="h-full bg-primary rounded-full transition-all duration-100 ease-out"
                 style={{ width: `${loadingProgress}%` }}
               />
             </div>
-            <div className="flex justify-between text-xs font-mono text-slate-400">
+            <div className="flex justify-between text-xs font-mono text-muted-foreground">
               <span className="lcd-text text-primary">Progress</span>
               <span>{loadingProgress}%</span>
             </div>
           </div>
 
-          <div className="bg-slate-950/70 rounded-xl border border-white/5 p-4 min-h-[72px] flex items-center justify-center">
-            <p className="text-[11px] font-mono text-slate-300 leading-relaxed text-center">
+          <div className="bg-card rounded-xl border border-border p-4 min-h-[72px] flex items-center justify-center">
+            <p className="text-[11px] font-mono text-muted-foreground leading-relaxed text-center">
               {loadingStep}
             </p>
           </div>
 
           <div className="flex items-center justify-center gap-2 pt-2">
-            <Cpu className="w-4 h-4 text-cyan-400 animate-spin" />
-            <span className="text-[9px] font-mono lcd-text text-slate-500 uppercase tracking-widest">
-              Zonalyze Engine Processing
+            <Cpu className="w-4 h-4 text-primary animate-spin" />
+            <span className="text-[9px] lcd-text text-muted-foreground">
+              BestSpot is working
             </span>
           </div>
         </Card>
@@ -863,63 +880,66 @@ export default function Dashboard() {
         <div className="absolute top-10 left-10 w-72 h-72 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
 
-        <header className="flex items-center justify-between pb-6 mb-8 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <img src="/logo.jpg" className="w-10 h-10 object-contain rounded-md border border-white/10" alt="Logo" />
+        <header className="flex items-center justify-between pb-6 mb-8 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <span className="brand-pin text-3xl" aria-hidden />
             <div>
-              <h1 className="text-xl font-display font-bold tracking-wider text-white">ZONALYZE</h1>
-              <p className="text-[10px] lcd-text text-muted-foreground">Feasibility intelligence Engine</p>
+              <h1 className="text-2xl font-display font-semibold text-foreground leading-none">BestSpot</h1>
+              <p className="text-[11px] text-muted-foreground mt-1">Find your best spot for your next business</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="outline" className="border-white/10 text-white/50 text-[10px] font-mono">
-              v{dashboardData.project_phase ? "1.0.0" : "0.1.0"}
+            <Badge variant="outline" className="border-border text-muted-foreground text-[10px]">
+              Ontario
             </Badge>
+            <AccountButton />
           </div>
         </header>
 
         <main className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-12 max-w-6xl mx-auto w-full z-10 py-6">
           <div className="flex-1 max-w-lg space-y-6 text-center lg:text-left">
-            <Badge className="bg-primary/20 text-primary hover:bg-primary/30 border border-primary/40 uppercase tracking-widest text-[10px] font-mono py-1 px-3">
-              Decision Support System
+            <Badge className="bg-secondary text-foreground/80 hover:bg-secondary border border-border uppercase tracking-widest text-[10px] py-1 px-3">
+              First shop or fifth — same 60 seconds
             </Badge>
-            <h2 className="text-4xl md:text-5xl font-display font-black text-white leading-tight tracking-tight">
-              Evaluate Location <br />
-              <span className="bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
-                Feasibility Instantly
-              </span>
+            <h2 className="text-4xl md:text-5xl font-display font-semibold text-foreground leading-[1.08] tracking-tight">
+              Will your business
+              <br />
+              work <span className="italic text-primary">there</span>?
             </h2>
-            <p className="text-slate-400 text-sm md:text-base leading-relaxed">
-              Analyze commercial spaces, competitor densities, daytime activities, and localized demographic mixes. Make data-driven decisions powered by machine learning algorithms.
+            <p className="text-muted-foreground text-sm md:text-base leading-relaxed">
+              Pick a spot. Name your idea. BestSpot shows the competition on a real map, what
+              it costs to run, and a straight answer —{" "}
+              <span className="text-foreground font-medium">before you sign a lease</span>.
             </p>
-            
+
             <div className="grid grid-cols-2 gap-4 text-left pt-2">
-              <div className="border border-white/5 bg-white/[0.02] p-4 rounded-xl">
-                <Users className="w-5 h-5 text-primary mb-2" />
-                <h4 className="text-xs font-display text-white tracking-wide uppercase">Demographics</h4>
-                <p className="text-[11px] text-slate-500 mt-1 leading-snug">Statistics Canada 2021 census mapping subdivisions.</p>
+              <div className="border border-border bg-card p-4 rounded-xl">
+                <MapPin className="w-5 h-5 text-primary mb-2" />
+                <h4 className="text-sm font-display text-foreground">Who's already there?</h4>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-snug">Every competitor near your spot, pinned on a real map.</p>
               </div>
-              <div className="border border-white/5 bg-white/[0.02] p-4 rounded-xl">
-                <MapPin className="w-5 h-5 text-accent mb-2" />
-                <h4 className="text-xs font-display text-white tracking-wide uppercase">Competitors</h4>
-                <p className="text-[11px] text-slate-500 mt-1 leading-snug">Live geographic mapping via OpenStreetMap Overpass.</p>
+              <div className="border border-border bg-card p-4 rounded-xl">
+                <Users className="w-5 h-5 text-accent mb-2" />
+                <h4 className="text-sm font-display text-foreground">Are your customers there?</h4>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-snug">Real census data for the people who live around it.</p>
               </div>
             </div>
           </div>
 
           <div className="w-full max-w-md">
-            <Card className="scada-panel border-white/10 rounded-2xl shadow-2xl p-6 space-y-6">
-              <div className="border-b border-white/5 pb-4">
-                <img src="/logo.jpg" className="w-32 mx-auto rounded-xl border border-white/10 shadow-md mb-4" alt="Logo" />
-                <h3 className="text-base font-display text-white text-center tracking-wider uppercase">
-                  Setup Scenario
-                </h3>
+            <Card className="scada-panel border-border rounded-2xl shadow-2xl p-6 space-y-6">
+              <div className="border-b border-border pb-4 text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="brand-pin text-2xl" aria-hidden />
+                  <h3 className="text-xl font-display font-semibold text-foreground">Check a spot</h3>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">Three answers. About a minute.</p>
               </div>
 
               <div className="space-y-5">
                 <div className="space-y-2">
                   <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> Target Municipality
+                    <MapPin className="w-3.5 h-3.5" /> Where? — city or town
                   </label>
                   <SearchableSelect
                     value={municipalityName}
@@ -936,13 +956,13 @@ export default function Dashboard() {
 
                 <div className="space-y-2">
                   <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> Specific Address <span className="opacity-60">(optional)</span>
+                    <MapPin className="w-3.5 h-3.5" /> Exact address <span className="opacity-60">(optional)</span>
                   </label>
                   <Input
                     value={siteAddress}
                     onChange={(event) => setSiteAddress(event.target.value)}
                     placeholder="e.g. 100 King St W — anchors the radius here"
-                    className="bg-background/50 border-white/10 font-mono text-sm h-11 rounded-xl focus-visible:ring-primary"
+                    className="bg-background/50 border-border font-mono text-sm h-11 rounded-xl focus-visible:ring-primary"
                   />
                   <p className="text-[10px] text-muted-foreground/70">
                     Leave blank to analyse from the city centre. Add an address to centre the radius on a specific storefront.
@@ -951,7 +971,7 @@ export default function Dashboard() {
 
                 <div className="space-y-2">
                   <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                    <Store className="w-3.5 h-3.5" /> Business — pick one or type any idea
+                    <Store className="w-3.5 h-3.5" /> What? — a business type, or your own idea
                   </label>
                   <SearchableSelect
                     value={businessInputMode === "custom" ? customBusinessQuery : businessSubcategory}
@@ -972,7 +992,7 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                      <Target className="w-3.5 h-3.5" /> Catchment Radius
+                      <Target className="w-3.5 h-3.5" /> How far will customers come from?
                     </label>
                     <span className="text-primary font-mono text-sm font-bold">
                       {radius[0]} km
@@ -989,20 +1009,20 @@ export default function Dashboard() {
                 </div>
 
                 <Button
-                  className="w-full bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/95 hover:to-cyan-500/95 text-white font-mono uppercase tracking-widest text-sm py-6 rounded-xl shadow-lg shadow-primary/20 transition-all duration-300 font-bold mt-4"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-mono uppercase tracking-widest text-sm py-6 rounded-xl shadow-lg shadow-primary/20 transition-all duration-300 font-bold mt-4"
                   onClick={handleStartAnalysis}
                   disabled={isUpdating}
                 >
                   <ChevronRight className="w-5 h-5 mr-2" />
-                  Analyze Location Feasibility
+                  Show me my spot
                 </Button>
               </div>
             </Card>
           </div>
         </main>
 
-        <footer className="py-6 border-t border-white/5 text-center text-[10px] lcd-text text-slate-600">
-          ZONALYZE FEASIBILITY PLATFORM • CAPSTONE PROTOTYPE
+        <footer className="py-6 border-t border-border text-center text-[10px] lcd-text text-muted-foreground">
+          BestSpot — find your best spot for your next business
         </footer>
       </div>
     );
@@ -1026,7 +1046,7 @@ export default function Dashboard() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary via-cyan-400 to-primary z-50 shadow-md shadow-primary/30"
+            className="fixed top-0 left-0 right-0 h-1.5 bg-primary z-50 shadow-md shadow-primary/30"
             style={{
               backgroundSize: "200% 100%",
               animation: "gradientSlide 1.5s linear infinite"
@@ -1036,27 +1056,22 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* Header Panel */}
-      <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 pb-4 border-b border-white/10 gap-4">
-        <div className="flex items-center gap-3">
-          <img src="/logo.jpg" className="w-12 h-12 rounded-md object-contain border border-white/10" alt="Logo" />
+      <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 pb-4 border-b border-border gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className="brand-pin text-3xl" aria-hidden />
           <div>
-            <h1 className="text-2xl font-display font-bold tracking-wider text-white">
-              ZONALYZE{" "}
-              <span className="text-primary text-xs tracking-widest uppercase">
-                ML.Core
-              </span>
-            </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="border-primary/20 text-primary-foreground text-[9px] uppercase font-mono py-0.5 px-2 bg-primary/5">
-                {municipalityName} • {businessSubcategory} • {radius[0]} km
+            <h1 className="text-2xl font-display font-semibold text-foreground leading-none">BestSpot</h1>
+            <div className="flex items-center gap-2 mt-1.5">
+              <Badge variant="outline" className="border-primary/25 text-primary text-[10px] py-0.5 px-2 bg-primary/5">
+                {municipalityName} · {businessSubcategory} · {radius[0]} km
               </Badge>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-5 text-[9px] font-mono text-muted-foreground hover:text-white uppercase px-1 underline"
+                className="h-5 text-[10px] text-muted-foreground hover:text-foreground px-1 underline"
                 onClick={() => setIsScenarioSelected(false)}
               >
-                Change Scenario
+                Change spot
               </Button>
             </div>
           </div>
@@ -1064,17 +1079,17 @@ export default function Dashboard() {
 
         {/* Sync/Status Indicators */}
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-md border border-white/5 backdrop-blur-md">
+          <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-md border border-border backdrop-blur-md">
             <Signal
-              className={`w-3.5 h-3.5 ${isUpdating ? "text-accent animate-pulse" : "text-emerald-400"}`}
+              className={`w-3.5 h-3.5 ${isUpdating ? "text-accent animate-pulse" : "text-emerald-600"}`}
             />
-            <span className="text-[10px] lcd-text text-white/80">
+            <span className="text-[10px] lcd-text text-foreground">
               {isUpdating ? "ENGINE SYNCING..." : `SYNCED: ${lastUpdate.toLocaleTimeString()}`}
             </span>
           </div>
           <Button
             variant="outline"
-            className="bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary-foreground font-mono text-xs uppercase tracking-wider"
+            className="bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary text-xs uppercase tracking-wider"
             onClick={handleExport}
             disabled={isExporting}
           >
@@ -1083,6 +1098,7 @@ export default function Dashboard() {
             />
             {isExporting ? "Exporting..." : "Export Report"}
           </Button>
+          <AccountButton />
         </div>
       </header>
 
@@ -1093,21 +1109,21 @@ export default function Dashboard() {
         <div className="lg:col-span-3 flex flex-col gap-4">
           
           {/* Quick Dials */}
-          <Card className="scada-panel border-white/5">
-            <CardHeader className="pb-3 border-b border-white/5">
-              <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90 flex justify-between items-center">
+          <Card className="scada-panel border-border">
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground flex justify-between items-center">
                 <span>Active Target</span>
-                <Badge variant="outline" className="border-white/10 text-[9px] font-mono">{radius[0]} km</Badge>
+                <Badge variant="outline" className="border-border text-[9px] font-mono">{radius[0]} km</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <div>
                 <p className="text-[10px] lcd-text text-muted-foreground">Location</p>
-                <p className="font-mono text-sm text-white mt-0.5">{municipalityName}</p>
+                <p className="font-mono text-sm text-foreground mt-0.5">{municipalityName}</p>
               </div>
               <div>
                 <p className="text-[10px] lcd-text text-muted-foreground">Business Subcategory</p>
-                <p className="font-mono text-sm text-white mt-0.5">{businessSubcategory}</p>
+                <p className="font-mono text-sm text-foreground mt-0.5">{businessSubcategory}</p>
               </div>
               <div className="pt-2">
                 <div className="flex justify-between items-center mb-1">
@@ -1138,15 +1154,15 @@ export default function Dashboard() {
             useCustomBusinessForMap={useCustomBusinessForMap}
             onUseCustomBusinessForMapChange={setUseCustomBusinessForMap}
             onBusinessResolutionChange={setBusinessResolution}
-            className="scada-panel border-white/5 shadow-md"
+            className="scada-panel border-border shadow-md"
           />
 
           {/* Validation Panel */}
-          <Card className="scada-panel border-white/5">
-            <CardHeader className="pb-3 border-b border-white/5">
-              <CardTitle className="text-xs font-display tracking-wider uppercase text-white/95 flex items-center justify-between">
+          <Card className="scada-panel border-border">
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
                   System Diagnostics
                 </span>
               </CardTitle>
@@ -1155,7 +1171,7 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full bg-emerald-400/10 hover:bg-emerald-400/20 border-emerald-400/30 text-emerald-100 font-mono text-xs uppercase"
+                className="w-full bg-emerald-400/10 hover:bg-emerald-400/20 border-emerald-400/30 text-emerald-700 font-mono text-xs uppercase"
                 onClick={handleRunValidation}
                 disabled={isValidating}
               >
@@ -1166,7 +1182,7 @@ export default function Dashboard() {
                   {systemValidation.checks.map((check) => (
                     <p
                       key={check.name}
-                      className={`text-[10px] font-mono ${check.status === "passed" ? "text-emerald-300" : "text-destructive"}`}
+                      className={`text-[10px] font-mono ${check.status === "passed" ? "text-emerald-700" : "text-destructive"}`}
                     >
                       {check.status === "passed" ? "PASS" : "FAIL"}: {check.name}
                     </p>
@@ -1177,7 +1193,7 @@ export default function Dashboard() {
           </Card>
 
           {/* ML Model Status */}
-          <Card className="scada-panel border-white/5">
+          <Card className="scada-panel border-border">
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <BrainCircuit
@@ -1187,17 +1203,17 @@ export default function Dashboard() {
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
                     Model Status
                   </p>
-                  <p className="text-xs font-mono text-white/80 uppercase">
+                  <p className="text-xs font-mono text-foreground uppercase">
                     {modelStatus?.status ?? "unknown"}
                   </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div className="rounded border border-white/10 bg-white/[0.03] p-1.5 text-center">
+                <div className="rounded border border-border bg-white/[0.03] p-1.5 text-center">
                   <p className="text-muted-foreground">Rows</p>
-                  <p className="font-mono text-white mt-0.5">{modelStatus ? formatNumber(modelStatus.row_count) : "N/A"}</p>
+                  <p className="font-mono text-foreground mt-0.5">{modelStatus ? formatNumber(modelStatus.row_count) : "N/A"}</p>
                 </div>
-                <div className="rounded border border-white/10 bg-white/[0.03] p-1.5 text-center">
+                <div className="rounded border border-border bg-white/[0.03] p-1.5 text-center">
                   <p className="text-muted-foreground">Accuracy</p>
                   <p className="font-mono text-primary mt-0.5">{formatPercent(modelStatus?.risk_accuracy)}</p>
                 </div>
@@ -1210,13 +1226,13 @@ export default function Dashboard() {
         <div className="lg:col-span-9 flex flex-col gap-6">
           
           {/* Navigation Tabs */}
-          <nav className="flex items-center gap-1 bg-slate-950/80 p-1.5 rounded-xl border border-white/10 overflow-x-auto scrollbar-hide">
+          <nav className="flex items-center gap-1 bg-card p-1.5 rounded-xl border border-border overflow-x-auto scrollbar-hide">
             {[
-              { id: "overview", label: "Overview", icon: BarChart4 },
-              { id: "map", label: "Geospatial Map", icon: MapPin },
-              { id: "evidence", label: "Evidence Indicators", icon: Database },
-              { id: "benchmarks", label: "Benchmarks Profile", icon: DollarSign },
-              { id: "history", label: "Compare Locations", icon: GitCompare },
+              { id: "map", label: "Your Spot", icon: MapPin },
+              { id: "overview", label: "The Verdict", icon: BarChart4 },
+              { id: "evidence", label: "The Evidence", icon: Database },
+              { id: "benchmarks", label: "Running Costs", icon: DollarSign },
+              { id: "history", label: "Find a Better Spot", icon: GitCompare },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1225,10 +1241,10 @@ export default function Dashboard() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-mono text-xs uppercase tracking-wider transition-all duration-200 shrink-0 ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-200 shrink-0 ${
                     isActive
-                      ? "bg-primary text-white shadow-lg shadow-primary/20 font-bold"
-                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 font-bold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -1255,14 +1271,14 @@ export default function Dashboard() {
                   <>
                     {/* Recommendation Decision Card */}
                     {recommendationDecision && (
-                      <Card className="scada-panel border-white/10 bg-primary/[0.02]">
+                      <Card className="scada-panel border-border bg-primary/[0.02]">
                         <CardContent className="p-6 space-y-4">
-                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/5 pb-3">
+                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-3">
                             <div>
                               <p className="text-[10px] text-primary uppercase tracking-widest font-mono">
                                 Unified Feasibility Recommendation
                               </p>
-                              <h3 className="text-xl font-bold text-white mt-1">
+                              <h3 className="text-xl font-bold text-foreground mt-1">
                                 {recommendationDecision.decision_summary}
                               </h3>
                             </div>
@@ -1274,19 +1290,19 @@ export default function Dashboard() {
                             </Badge>
                           </div>
                           
-                          <p className="text-sm text-slate-300 leading-relaxed">
+                          <p className="text-sm text-muted-foreground leading-relaxed">
                             {recommendationDecision.action_guidance}
                           </p>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                             <div className="space-y-2">
-                              <p className="text-xs font-mono text-emerald-400 uppercase tracking-wider">
+                              <p className="text-xs font-mono text-emerald-600 uppercase tracking-wider">
                                 Primary Strengths
                               </p>
                               <ul className="space-y-1.5">
                                 {recommendationDecision.major_strengths.map((item) => (
-                                  <li key={item} className="text-xs text-slate-300 flex items-start gap-2">
-                                    <span className="text-emerald-400 font-bold">•</span>
+                                  <li key={item} className="text-xs text-muted-foreground flex items-start gap-2">
+                                    <span className="text-emerald-600 font-bold">•</span>
                                     <span>{item}</span>
                                   </li>
                                 ))}
@@ -1298,7 +1314,7 @@ export default function Dashboard() {
                               </p>
                               <ul className="space-y-1.5">
                                 {recommendationDecision.major_concerns.map((item) => (
-                                  <li key={item} className="text-xs text-slate-300 flex items-start gap-2">
+                                  <li key={item} className="text-xs text-muted-foreground flex items-start gap-2">
                                     <span className="text-destructive font-bold">•</span>
                                     <span>{item}</span>
                                   </li>
@@ -1316,7 +1332,7 @@ export default function Dashboard() {
                         <CardContent className="p-5">
                           <p className="text-[10px] lcd-text text-muted-foreground">Total Population</p>
                           <p className="text-3xl data-value mt-1">{formatNumber(populationValue)}</p>
-                          <p className="text-[10px] text-slate-500 mt-2 font-mono">{municipalityName}</p>
+                          <p className="text-[10px] text-muted-foreground mt-2 font-mono">{municipalityName}</p>
                         </CardContent>
                       </Card>
                       <Card className="scada-panel">
@@ -1325,7 +1341,7 @@ export default function Dashboard() {
                           <p className="text-3xl data-value-accent mt-1">
                             {ml?.predicted_feasibility_score?.toFixed(1) ?? "N/A"}/100
                           </p>
-                          <p className="text-[10px] text-slate-500 mt-2 font-mono">Simulated Score</p>
+                          <p className="text-[10px] text-muted-foreground mt-2 font-mono">Simulated Score</p>
                         </CardContent>
                       </Card>
                       <Card className="scada-panel">
@@ -1334,7 +1350,7 @@ export default function Dashboard() {
                           <p className={`text-2xl font-mono mt-1.5 font-bold ${indicatorTextClass(dashboardData.revenue_monitor.indicator)}`}>
                             {formatCurrency(ml?.predicted_monthly_net_revenue)}
                           </p>
-                          <p className="text-[10px] text-slate-500 mt-2 font-mono">Net Profit/Month</p>
+                          <p className="text-[10px] text-muted-foreground mt-2 font-mono">Net Profit/Month</p>
                         </CardContent>
                       </Card>
                       <Card className="scada-panel">
@@ -1343,7 +1359,7 @@ export default function Dashboard() {
                           <p className={`text-3xl font-mono mt-1 font-bold ${indicatorTextClass(dashboardData.risk_monitor.indicator)}`}>
                             {ml?.predicted_risk_class?.toUpperCase() ?? "N/A"}
                           </p>
-                          <p className="text-[10px] text-slate-500 mt-2 font-mono">ML Risk Index</p>
+                          <p className="text-[10px] text-muted-foreground mt-2 font-mono">ML Risk Index</p>
                         </CardContent>
                       </Card>
                     </div>
@@ -1352,7 +1368,7 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
                       <Card className="scada-panel flex flex-col h-full">
                         <CardHeader className="pb-0 pt-4 px-5">
-                          <CardTitle className="text-xs lcd-text text-white/80">Population Coverage Area</CardTitle>
+                          <CardTitle className="text-xs lcd-text text-foreground">Population Coverage Area</CardTitle>
                         </CardHeader>
                         <CardContent className="flex-1 p-0 px-2 pb-2 mt-2">
                           <ResponsiveContainer width="100%" height="100%">
@@ -1375,7 +1391,7 @@ export default function Dashboard() {
 
                       <Card className="scada-panel flex flex-col h-full">
                         <CardHeader className="pb-0 pt-4 px-5">
-                          <CardTitle className="text-xs lcd-text text-white/80">Demographic Segment Distribution</CardTitle>
+                          <CardTitle className="text-xs lcd-text text-foreground">Demographic Segment Distribution</CardTitle>
                         </CardHeader>
                         <CardContent className="flex-1 p-0 px-2 pb-4 mt-2">
                           <ResponsiveContainer width="100%" height="100%">
@@ -1399,9 +1415,9 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <Card className="scada-panel md:col-span-2">
                         <CardHeader className="pb-2">
-                          <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90">Prediction Explanation Summary</CardTitle>
+                          <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground">Prediction Explanation Summary</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4 text-xs text-slate-300 leading-relaxed">
+                        <CardContent className="space-y-4 text-xs text-muted-foreground leading-relaxed">
                           <p>{explanation?.revenue_explanation}</p>
                           <p>{explanation?.risk_explanation}</p>
                           <p>{explanation?.feasibility_explanation}</p>
@@ -1410,14 +1426,14 @@ export default function Dashboard() {
 
                       <Card className="scada-panel">
                         <CardHeader className="pb-2">
-                          <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90">Main Drivers</CardTitle>
+                          <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground">Main Drivers</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                           <div>
-                            <p className="text-[9px] text-emerald-400 font-mono uppercase tracking-widest mb-1.5">Positive Factors</p>
+                            <p className="text-[9px] text-emerald-600 font-mono uppercase tracking-widest mb-1.5">Positive Factors</p>
                             <div className="space-y-1">
                               {(explanation?.top_positive_factors ?? []).map((factor) => (
-                                <p key={factor} className="text-xs text-slate-300 border-l border-emerald-400/30 pl-2">{factor}</p>
+                                <p key={factor} className="text-xs text-muted-foreground border-l border-emerald-400/30 pl-2">{factor}</p>
                               ))}
                             </div>
                           </div>
@@ -1425,7 +1441,7 @@ export default function Dashboard() {
                             <p className="text-[9px] text-destructive font-mono uppercase tracking-widest mb-1.5">Negative Factors</p>
                             <div className="space-y-1">
                               {(explanation?.top_negative_factors ?? []).map((factor) => (
-                                <p key={factor} className="text-xs text-slate-300 border-l border-destructive/30 pl-2">{factor}</p>
+                                <p key={factor} className="text-xs text-muted-foreground border-l border-destructive/30 pl-2">{factor}</p>
                               ))}
                             </div>
                           </div>
@@ -1444,8 +1460,8 @@ export default function Dashboard() {
                         <div
                           className={`rounded-xl border px-4 py-2.5 text-xs font-mono flex items-start gap-2 ${
                             geoContext.anchor_type === "address"
-                              ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-200"
-                              : "border-amber-500/25 bg-amber-500/5 text-amber-200"
+                              ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-700"
+                              : "border-amber-500/25 bg-amber-500/5 text-amber-700"
                           }`}
                         >
                           <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -1466,7 +1482,7 @@ export default function Dashboard() {
                           <div
                             className={`rounded-xl border px-4 py-2.5 text-xs font-mono flex items-start gap-2 ${
                               geoContext.score_basis === "unavailable"
-                                ? "border-rose-500/25 bg-rose-500/5 text-rose-200"
+                                ? "border-rose-500/25 bg-rose-500/5 text-rose-700"
                                 : "border-sky-500/25 bg-sky-500/5 text-sky-200"
                             }`}
                           >
@@ -1503,55 +1519,55 @@ export default function Dashboard() {
                 {activeTab === "evidence" && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Demand Card */}
-                    <Card className="scada-panel border-white/5">
+                    <Card className="scada-panel border-border">
                       <CardContent className="p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                        <div className="flex items-center justify-between border-b border-border pb-2">
                           <div className="flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-emerald-400" />
+                            <TrendingUp className="w-5 h-5 text-emerald-600" />
                             <div>
                               <p className="text-[10px] text-muted-foreground uppercase font-mono">Demand Evidence</p>
-                              <p className="text-xs font-mono text-white/80">{demandEvidence ? demandEvidence.credibility : "Fallback Proxy"}</p>
+                              <p className="text-xs font-mono text-foreground">{demandEvidence ? demandEvidence.credibility : "Fallback Proxy"}</p>
                             </div>
                           </div>
-                          <Badge variant="outline" className="text-emerald-400 border-emerald-400/30 uppercase font-mono text-[10px]">
+                          <Badge variant="outline" className="text-emerald-600 border-emerald-400/30 uppercase font-mono text-[10px]">
                             {demandEvidence ? demandEvidence.demand_level : "Proxy"}
                           </Badge>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">DEMAND INDEX</p>
-                            <p className="text-sm text-emerald-400 mt-0.5">{demandEvidence?.demand_pressure_index?.toFixed(1) ?? "N/A"}</p>
+                            <p className="text-sm text-emerald-600 mt-0.5">{demandEvidence?.demand_pressure_index?.toFixed(1) ?? "N/A"}</p>
                           </div>
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">CUSTOMER POOL</p>
-                            <p className="text-sm text-white mt-0.5">{demandEvidence ? formatNumber(demandEvidence.target_customer_pool_estimate) : "N/A"}</p>
+                            <p className="text-sm text-foreground mt-0.5">{demandEvidence ? formatNumber(demandEvidence.target_customer_pool_estimate) : "N/A"}</p>
                           </div>
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">FOOT TRAFFIC</p>
-                            <p className="text-sm text-white mt-0.5">{demandEvidence?.foot_traffic_proxy_index?.toFixed(1) ?? "N/A"}</p>
+                            <p className="text-sm text-foreground mt-0.5">{demandEvidence?.foot_traffic_proxy_index?.toFixed(1) ?? "N/A"}</p>
                           </div>
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">TRANSIT INDEX</p>
-                            <p className="text-sm text-white mt-0.5">{demandEvidence?.transit_access_proxy_index?.toFixed(1) ?? "N/A"}</p>
+                            <p className="text-sm text-foreground mt-0.5">{demandEvidence?.transit_access_proxy_index?.toFixed(1) ?? "N/A"}</p>
                           </div>
                         </div>
 
-                        <p className="text-xs text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                        <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-3">
                           {demandEvidence ? demandEvidence.data_quality_note : "No catalog row exists for this selected scenario. Using explicit fallback proxy index."}
                         </p>
                       </CardContent>
                     </Card>
 
                     {/* Competition Card */}
-                    <Card className="scada-panel border-white/5">
+                    <Card className="scada-panel border-border">
                       <CardContent className="p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                        <div className="flex items-center justify-between border-b border-border pb-2">
                           <div className="flex items-center gap-2">
                             <Database className="w-5 h-5 text-primary" />
                             <div>
                               <p className="text-[10px] text-muted-foreground uppercase font-mono">Competition Evidence</p>
-                              <p className="text-xs font-mono text-white/80">
+                              <p className="text-xs font-mono text-foreground">
                                 {competitionIsLiveOsm
                                   ? (competitionEvidence?.source_name ?? "OpenStreetMap")
                                   : competitionEvidence
@@ -1564,7 +1580,7 @@ export default function Dashboard() {
                             variant="outline"
                             className={
                               competitionIsLiveOsm
-                                ? "text-emerald-300 border-emerald-400/40 uppercase font-mono text-[10px]"
+                                ? "text-emerald-700 border-emerald-400/40 uppercase font-mono text-[10px]"
                                 : "text-primary border-primary/30 uppercase font-mono text-[10px]"
                             }
                           >
@@ -1573,41 +1589,41 @@ export default function Dashboard() {
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">COMPETITORS</p>
-                            <p className="text-sm text-white mt-0.5">{competitionEvidence?.observed_competitor_count ?? "N/A"}</p>
+                            <p className="text-sm text-foreground mt-0.5">{competitionEvidence?.observed_competitor_count ?? "N/A"}</p>
                           </div>
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">DENSITY / 10K</p>
-                            <p className="text-sm text-white mt-0.5">{competitionEvidence?.competitor_density_per_10k?.toFixed(2) ?? "N/A"}</p>
+                            <p className="text-sm text-foreground mt-0.5">{competitionEvidence?.competitor_density_per_10k?.toFixed(2) ?? "N/A"}</p>
                           </div>
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">NEAREST POI</p>
-                            <p className="text-sm text-white mt-0.5">
+                            <p className="text-sm text-foreground mt-0.5">
                               {competitionEvidence?.nearest_competitor_distance_km != null ? `${competitionEvidence.nearest_competitor_distance_km.toFixed(1)} km` : "N/A"}
                             </p>
                           </div>
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">COMP. PRESSURE</p>
                             <p className="text-sm text-primary mt-0.5">{competitionEvidence?.competition_pressure_index?.toFixed(1) ?? "N/A"}</p>
                           </div>
                         </div>
 
-                        <p className="text-xs text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                        <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-3">
                           {competitionEvidence ? competitionEvidence.source_method : "No catalog row exists for this selected scenario. Using explicit fallback proxy distance."}
                         </p>
                       </CardContent>
                     </Card>
 
                     {/* Lease Cost Card */}
-                    <Card className="scada-panel border-white/5">
+                    <Card className="scada-panel border-border">
                       <CardContent className="p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                        <div className="flex items-center justify-between border-b border-border pb-2">
                           <div className="flex items-center gap-2">
                             <DollarSign className="w-5 h-5 text-accent" />
                             <div>
                               <p className="text-[10px] text-muted-foreground uppercase font-mono">Lease Cost Evidence</p>
-                              <p className="text-xs font-mono text-white/80">{leaseCostEvidence ? leaseCostEvidence.credibility : "Fallback Proxy"}</p>
+                              <p className="text-xs font-mono text-foreground">{leaseCostEvidence ? leaseCostEvidence.credibility : "Fallback Proxy"}</p>
                             </div>
                           </div>
                           <Badge variant="outline" className="text-accent border-accent/30 uppercase font-mono text-[10px]">
@@ -1616,35 +1632,35 @@ export default function Dashboard() {
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">MEDIAN LEASE</p>
-                            <p className="text-sm text-white mt-0.5">{formatCurrency(leaseCostEvidence?.median_monthly_lease_cost)}</p>
+                            <p className="text-sm text-foreground mt-0.5">{formatCurrency(leaseCostEvidence?.median_monthly_lease_cost)}</p>
                           </div>
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded">
                             <p className="text-[9px] text-muted-foreground">COST / SQFT / YR</p>
-                            <p className="text-sm text-white mt-0.5">
+                            <p className="text-sm text-foreground mt-0.5">
                               {leaseCostEvidence?.lease_cost_per_sqft_year != null ? `$${leaseCostEvidence.lease_cost_per_sqft_year.toFixed(2)}` : "N/A"}
                             </p>
                           </div>
-                          <div className="border border-white/5 bg-white/[0.02] p-2 rounded col-span-2">
+                          <div className="border border-border bg-white/[0.02] p-2 rounded col-span-2">
                             <p className="text-[9px] text-muted-foreground">MONTHLY ESTIMATE RANGE</p>
-                            <p className="text-xs text-white mt-0.5">
+                            <p className="text-xs text-foreground mt-0.5">
                               {leaseCostEvidence ? `${formatCurrency(leaseCostEvidence.low_monthly_lease_cost)} - ${formatCurrency(leaseCostEvidence.high_monthly_lease_cost)}` : "N/A"}
                             </p>
                           </div>
                         </div>
 
-                        <p className="text-xs text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                        <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-3">
                           {leaseCostEvidence ? leaseCostEvidence.data_quality_note : "No lease evidence row exists for this selected scenario. Using explicit fallback range."}
                         </p>
                       </CardContent>
                     </Card>
 
                     {/* Data Credibility Audits */}
-                    <Card className="scada-panel border-white/5 md:col-span-3">
+                    <Card className="scada-panel border-border md:col-span-3">
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-center">
-                          <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90">Prediction Credibility Audit</CardTitle>
+                          <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground">Prediction Credibility Audit</CardTitle>
                           <Badge variant="outline" className={credibilityClass(credibility?.confidence_level)}>
                             {credibility?.confidence_level?.toUpperCase()} CONFIDENCE · {credibility?.overall_confidence_score?.toFixed(1)}/100
                           </Badge>
@@ -1653,11 +1669,11 @@ export default function Dashboard() {
                       <CardContent className="space-y-4 text-xs">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <p className="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">Observed Real Data</p>
+                            <p className="text-[10px] text-emerald-600 font-mono uppercase tracking-widest">Observed Real Data</p>
                             <div className="space-y-1">
                               {(credibility?.observed_inputs ?? []).slice(0, 3).map((item) => (
-                                <p key={item.field_name} className="p-2 border border-white/5 bg-white/[0.01] rounded">
-                                  <strong className="text-white font-mono">{item.label}:</strong> {item.user_note}
+                                <p key={item.field_name} className="p-2 border border-border bg-white/[0.01] rounded">
+                                  <strong className="text-foreground font-mono">{item.label}:</strong> {item.user_note}
                                 </p>
                               ))}
                             </div>
@@ -1697,9 +1713,9 @@ export default function Dashboard() {
                 {activeTab === "history" && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     {/* Left comparison control and history list */}
-                    <Card className="scada-panel border-white/5 lg:col-span-4 h-full">
-                      <CardHeader className="pb-3 border-b border-white/5">
-                        <CardTitle className="text-xs font-display tracking-wider uppercase text-white/90">Scenario Controls</CardTitle>
+                    <Card className="scada-panel border-border lg:col-span-4 h-full">
+                      <CardHeader className="pb-3 border-b border-border">
+                        <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground">Scenario Controls</CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 space-y-4">
                         <div className="grid grid-cols-2 gap-2">
@@ -1714,7 +1730,7 @@ export default function Dashboard() {
                           </Button>
                           <Button
                             variant="outline"
-                            className="bg-white/[0.03] hover:bg-white/[0.07] border-white/10 text-white font-mono text-xs uppercase"
+                            className="bg-white/[0.03] hover:bg-white/[0.07] border-border text-foreground font-mono text-xs uppercase"
                             onClick={handleCompareScenarios}
                             disabled={isComparingScenarios || scenarioHistory.length < 1}
                           >
@@ -1726,27 +1742,27 @@ export default function Dashboard() {
                         {scenarioHistory.length > 0 && (
                           <Button
                             variant="ghost"
-                            className="w-full text-[10px] text-white/50 hover:text-white/80 uppercase font-mono"
+                            className="w-full text-[10px] text-muted-foreground hover:text-foreground uppercase font-mono"
                             onClick={handleClearHistory}
                           >
                             Clear Comparison History
                           </Button>
                         )}
 
-                        <div className="space-y-2 border-t border-white/5 pt-4">
+                        <div className="space-y-2 border-t border-border pt-4">
                           <p className="text-[10px] text-muted-foreground uppercase font-mono">Saved Scenarios ({scenarioHistory.length})</p>
                           <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
                             {scenarioHistory.map((item) => (
-                              <div key={item.scenario_id} className="rounded border border-white/10 bg-white/[0.02] p-3 text-xs">
-                                <p className="font-mono text-white font-semibold">{item.business_subcategory}</p>
-                                <p className="text-[10px] text-slate-400 mt-0.5">{item.municipality_name} • {item.radius_km} km</p>
+                              <div key={item.scenario_id} className="rounded border border-border bg-white/[0.02] p-3 text-xs">
+                                <p className="font-mono text-foreground font-semibold">{item.business_subcategory}</p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">{item.municipality_name} • {item.radius_km} km</p>
                                 <p className="text-[10px] text-primary font-mono mt-1">
                                   {formatCurrency(item.predicted_monthly_net_revenue)} • Score: {item.predicted_feasibility_score?.toFixed(1) ?? "N/A"}
                                 </p>
                               </div>
                             ))}
                             {scenarioHistory.length === 0 && (
-                              <p className="text-[10px] text-slate-500 italic">No saved scenarios yet. Click &apos;Save Active&apos; to add the current workspace parameters.</p>
+                              <p className="text-[10px] text-muted-foreground italic">No saved scenarios yet. Click &apos;Save Active&apos; to add the current workspace parameters.</p>
                             )}
                           </div>
                         </div>
@@ -1767,21 +1783,21 @@ export default function Dashboard() {
                       />
 
                       {scenarioComparison && (
-                        <Card className="scada-panel border-white/10 bg-accent/[0.01]">
+                        <Card className="scada-panel border-border bg-accent/[0.01]">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-xs font-display tracking-wider uppercase text-accent">Comparison Summary Insights</CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-4">
-                            <p className="text-xs text-slate-300 leading-relaxed">
+                            <p className="text-xs text-muted-foreground leading-relaxed">
                               {scenarioComparison.comparison_summary}
                             </p>
                             
-                            <div className="space-y-2 border-t border-white/5 pt-3">
+                            <div className="space-y-2 border-t border-border pt-3">
                               <p className="text-[10px] text-muted-foreground uppercase font-mono">Rankings Matrix</p>
                               {scenarioComparison.rankings.map((item, index) => (
-                                <div key={item.scenario_id} className="flex justify-between items-center p-2.5 rounded bg-white/[0.01] border border-white/5 text-xs">
-                                  <span className="font-mono text-slate-300">
-                                    <strong className="text-white">#{index + 1}</strong> {item.label}
+                                <div key={item.scenario_id} className="flex justify-between items-center p-2.5 rounded bg-white/[0.01] border border-border text-xs">
+                                  <span className="font-mono text-muted-foreground">
+                                    <strong className="text-foreground">#{index + 1}</strong> {item.label}
                                   </span>
                                   <span className="font-mono text-accent font-bold">{item.overall_score.toFixed(1)}/100</span>
                                 </div>
@@ -1809,17 +1825,17 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 30, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="w-[90vw] sm:w-[420px] shadow-2xl rounded-2xl overflow-hidden border border-white/10 bg-slate-950/95 backdrop-blur-xl"
+              className="w-[90vw] sm:w-[420px] shadow-2xl rounded-2xl overflow-hidden border border-border bg-card backdrop-blur-xl"
             >
-              <div className="bg-primary/20 p-3 flex justify-between items-center border-b border-white/10">
+              <div className="bg-primary/20 p-3 flex justify-between items-center border-b border-border">
                 <div className="flex items-center gap-2">
                   <BrainCircuit className="w-5 h-5 text-primary" />
-                  <span className="font-display text-xs text-white font-bold tracking-wider">Zonalyze AI Assistant</span>
+                  <span className="font-display text-xs text-foreground font-bold tracking-wider">BestSpot Assistant</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsChatOpen(false)}
-                  className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-white transition"
+                  className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1841,8 +1857,8 @@ export default function Dashboard() {
           onClick={() => setIsChatOpen(!isChatOpen)}
           className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
             isChatOpen
-              ? "bg-destructive text-white hover:bg-destructive/90"
-              : "bg-primary text-white hover:bg-primary/95 shadow-primary/20 hover:scale-105"
+              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              : "bg-primary text-primary-foreground hover:bg-primary/95 shadow-primary/20 hover:scale-105"
           }`}
           title="Toggle Assistant"
         >

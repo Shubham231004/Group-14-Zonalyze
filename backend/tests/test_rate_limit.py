@@ -3,10 +3,7 @@ from __future__ import annotations
 
 import importlib
 
-import pytest
 from fastapi.testclient import TestClient
-
-pytest.importorskip("slowapi")
 
 
 def test_rate_limit_returns_429_when_enabled(monkeypatch):

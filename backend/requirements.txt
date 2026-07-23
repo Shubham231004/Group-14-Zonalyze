@@ -26,7 +26,6 @@ requests==2.34.2
 scikit-learn==1.8.0
 scipy==1.17.1
 six==1.17.0
-slowapi==0.1.9
 SQLAlchemy==2.0.48
 starlette==0.52.1
 threadpoolctl==3.6.0

@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
-import { ClerkProvider, SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
+import { ClerkProvider, SignedIn, SignedOut } from "@clerk/clerk-react";
 import App from "./App";
+import Landing from "./pages/landing";
 import "./index.css";
 import { installAuthFetch } from "./lib/authFetch";
 
@@ -10,23 +11,25 @@ const root = createRoot(document.getElementById("root")!);
 
 if (clerkKey) {
   // Auth ON: attach Clerk tokens to API calls and gate the app behind sign-in.
+  // Signed-out visitors get the BestSpot landing page (sign-in embedded) so they
+  // understand the product before being asked for an account.
   installAuthFetch();
   root.render(
-    <ClerkProvider publishableKey={clerkKey}>
+    <ClerkProvider
+      publishableKey={clerkKey}
+      appearance={{
+        variables: {
+          colorPrimary: "#d63a2c",
+          fontFamily: '"Public Sans", system-ui, sans-serif',
+          borderRadius: "0.75rem",
+        },
+      }}
+    >
       <SignedIn>
         <App />
       </SignedIn>
       <SignedOut>
-        <div
-          style={{
-            minHeight: "100vh",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <SignIn routing="hash" />
-        </div>
+        <Landing />
       </SignedOut>
     </ClerkProvider>,
   );
