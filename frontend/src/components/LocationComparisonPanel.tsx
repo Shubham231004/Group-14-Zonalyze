@@ -147,6 +147,14 @@ export default function LocationComparisonPanel({
         </div>
       )}
 
+      {comparison && comparison.results.length > 0 && comparison.results.every((r) => r.decision_score < 0) && (
+        <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Every compared option currently scores below viability for this business type — the
+          ranking shows the least risky option, not a recommended one. Consider a different
+          business type, city, or radius.
+        </div>
+      )}
+
       {best && (
         <div className="mt-5 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/90">Best current option</p>

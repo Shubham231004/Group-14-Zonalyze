@@ -1,6 +1,6 @@
 {
   "model_version": "step18_business_catalog_v2",
-  "trained_at_utc": "2026-07-14T20:51:30.828342+00:00",
+  "trained_at_utc": "2026-07-23T05:18:52.550722+00:00",
   "dataset_path": "C:\\Users\\giris\\OneDrive - Conestoga College\\Semester 7\\Capstone\\Project\\Group-14-Zonalyze\\backend\\app\\data\\generated\\zonalyze_training_dataset_v2.csv",
   "row_count": 50000,
   "feature_count": 45,
@@ -64,43 +64,43 @@
   ],
   "municipality_count": 355,
   "business_subcategory_count": 26,
-  "risk_accuracy": 0.5857,
+  "risk_accuracy": 0.6071,
   "risk_classification_report": {
     "high": {
-      "precision": 0.4678687008784096,
-      "recall": 0.3518776077885953,
-      "f1-score": 0.401666997420123,
-      "support": 2876.0
+      "precision": 0.3585714285714286,
+      "recall": 0.15342298288508557,
+      "f1-score": 0.2148972602739726,
+      "support": 1636.0
     },
     "low": {
-      "precision": 0.7189922480620154,
-      "recall": 0.25203804347826086,
-      "f1-score": 0.3732394366197183,
-      "support": 1472.0
+      "precision": 0.6790322580645162,
+      "recall": 0.3185773741959894,
+      "f1-score": 0.43368529487509655,
+      "support": 2643.0
     },
     "medium": {
-      "precision": 0.6111186996311979,
-      "recall": 0.7915782024062279,
-      "f1-score": 0.6897402297078548,
-      "support": 5652.0
+      "precision": 0.6176178660049628,
+      "recall": 0.8701276000699179,
+      "f1-score": 0.7224439445613526,
+      "support": 5721.0
     },
-    "accuracy": 0.5857,
+    "accuracy": 0.6071,
     "macro avg": {
-      "precision": 0.5993265495238743,
-      "recall": 0.46516461789102803,
-      "f1-score": 0.4882155545825653,
+      "precision": 0.5517405175469693,
+      "recall": 0.4473759857169976,
+      "f1-score": 0.45700883323680724,
       "support": 10000.0
     },
     "weighted avg": {
-      "precision": 0.5857989863189124,
-      "recall": 0.5857,
-      "f1-score": 0.5603014513593294,
+      "precision": 0.5914696926621765,
+      "recall": 0.6071,
+      "f1-score": 0.5630903958998599,
       "support": 10000.0
     }
   },
-  "revenue_r2": 0.9319,
-  "revenue_mae": 274.99,
-  "feasibility_r2": 0.9908,
-  "feasibility_mae": 0.21,
+  "revenue_r2": 0.9974,
+  "revenue_mae": 97.32,
+  "feasibility_r2": 0.9889,
+  "feasibility_mae": 0.46,
   "important_note": "Models are trained on improved simulation-generated labels. They support prototype predictions and should not be presented as validated real-world financial outcomes."
 }

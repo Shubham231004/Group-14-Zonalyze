@@ -104,6 +104,7 @@ class BusinessProfile:
     competition_sensitivity: float
     lease_sensitivity: float
     demand_sensitivity: float
+    gross_margin_pct: float = 0.62
 
 
 # Column mapping from the census "selected features" CSV to MunicipalitySignals.
@@ -164,14 +165,23 @@ def normalize_business_profile(config: Dict[str, Any]) -> BusinessProfile:
         group=group,
         avg_ticket=_to_float(config.get("avg_ticket"), 20.0),
         space_sqft=_to_float(config.get("space_sqft"), 1500.0),
+        # Calibration (2026-07): the catalog's capture rates preserve good RELATIVE
+        # differentiation between business types, but their absolute scale produced
+        # ~34 customers/day for every type — far below real volumes (pizza ~90
+        # orders/day, cafe ~220, dental ~13) — which pushed most simulated
+        # scenarios to negative revenue. x4.8 lands those benchmarks within
+        # tolerance. ponytail: single global factor; per-type recalibration of the
+        # catalog is the upgrade path if individual types drift.
         base_capture_rate=_to_float(
             config.get("base_capture_rate", config.get("target_customer_rate")), 0.0025
-        ),
+        )
+        * 4.8,
         repeat_customer_factor=_to_float(config.get("repeat_customer_factor"), 1.0),
         operating_cost_multiplier=_to_float(config.get("operating_cost_multiplier"), 1.0),
         competition_sensitivity=_to_float(config.get("competition_sensitivity"), 1.0),
         lease_sensitivity=_to_float(config.get("lease_sensitivity"), 1.0),
         demand_sensitivity=_to_float(config.get("demand_sensitivity"), 0.65),
+        gross_margin_pct=bounded(_to_float(config.get("gross_margin_pct"), 0.62), 0.20, 0.90),
     )
 
 
@@ -207,13 +217,19 @@ def build_scenario_record(
         max(250.0, muni.population_2021),
     )
 
+    # Floor lowered 0.005 -> 0.001: the old floor sat ABOVE every calibrated
+    # catalog rate, flattening all business types to identical customer volume.
     if rng is not None:
         target_customer_rate = bounded(
-            rng.normal(biz.base_capture_rate, biz.base_capture_rate * 0.20), 0.005, 0.20
+            rng.normal(biz.base_capture_rate, biz.base_capture_rate * 0.20), 0.001, 0.20
         )
     else:
-        target_customer_rate = bounded(biz.base_capture_rate, 0.005, 0.20)
-    target_customer_pool = reachable_population * target_customer_rate * biz.repeat_customer_factor
+        target_customer_rate = bounded(biz.base_capture_rate, 0.001, 0.20)
+    # A single store's effective draw saturates: capture scaling linearly with a
+    # metro population gave one Toronto pizza shop $347k/mo. Cap the capture base
+    # at ~300k people. ponytail: dividing the pool by same-type competitor share
+    # is the more principled upgrade path.
+    target_customer_pool = min(reachable_population, 300000.0) * target_customer_rate * biz.repeat_customer_factor
 
     income_index = muni.income_index
     density_index = muni.density_index
@@ -247,8 +263,11 @@ def build_scenario_record(
         100,
     )
 
-    base_psf = 18 + (density_index * 0.28) + (income_index * 0.16) + _noise(rng, 5)
-    psf_year = bounded(base_psf * (0.75 + biz.lease_sensitivity * 0.65), 12, 85)
+    # Calibration (2026-07): the old coefficients priced Kitchener at $72-85/sqft
+    # (Toronto-prime level; real K-W retail is ~$20-38). These land K-W ~$30-35
+    # and cap at $60 so dense-city premiums stay plausible.
+    base_psf = 12 + (density_index * 0.12) + (income_index * 0.07) + _noise(rng, 3)
+    psf_year = bounded(base_psf * (0.85 + biz.lease_sensitivity * 0.35), 10, 60)
     median_monthly_lease = (psf_year * estimated_space_sqft) / 12.0
     lease_low = median_monthly_lease * _uniform(rng, 0.72, 0.88)
     lease_high = median_monthly_lease * _uniform(rng, 1.15, 1.45)
@@ -272,7 +291,7 @@ def build_scenario_record(
         * (1.15 - competition_pressure / 260.0)
         * _uniform(rng, 0.85, 1.25),
         2,
-        2500,
+        600,  # per-store daily ceiling (was 2500 — no single local shop serves that)
     )
 
     operating_days_per_month = _choice(rng, [24, 26, 28, 30], 28)
@@ -282,7 +301,13 @@ def build_scenario_record(
     utilities_cost = 600 + estimated_space_sqft * _uniform(rng, 0.25, 0.85)
     insurance_cost = _uniform(rng, 250, 900)
     marketing_cost = max(450, gross_revenue * _uniform(rng, 0.025, 0.075))
-    inventory_or_supply_cost = gross_revenue * _uniform(rng, 0.22, 0.48)
+    # Calibration (2026-07): COGS now comes from the catalog's curated per-type
+    # gross_margin_pct (a grocery runs ~66% COGS, a clinic ~35%) instead of a
+    # uniform 22-48% guess that made thin-margin retail look wildly profitable.
+    cogs_share = 1.0 - biz.gross_margin_pct
+    inventory_or_supply_cost = gross_revenue * (
+        _uniform(rng, cogs_share * 0.90, cogs_share * 1.10) if rng is not None else cogs_share
+    )
     monthly_operating_cost = median_monthly_lease + staff_cost + utilities_cost + insurance_cost + marketing_cost + inventory_or_supply_cost
     monthly_net_revenue = gross_revenue - monthly_operating_cost
 
