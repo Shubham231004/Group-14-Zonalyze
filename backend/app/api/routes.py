@@ -1,6 +1,10 @@
 import logging
 
+from typing import Any, Optional
+
 from fastapi import APIRouter, Depends
+
+from app.core.auth import require_user
 from sqlalchemy.orm import Session
 
 from app.db.test_connection import test_database_connection
@@ -393,28 +397,43 @@ def osm_pois_route(request: AnalyzeScenarioRequest):
     }
 
 
+def _user_id(claims: Optional[dict[str, Any]]) -> Optional[str]:
+    # Clerk JWT subject = the user id. None when auth is disabled (shared history).
+    return claims.get("sub") if claims else None
+
+
 @router.post("/scenario-history/save", response_model=ScenarioHistoryItem)
 def save_scenario_history_route(
     request: AnalyzeScenarioRequest,
     db: Session = Depends(get_db),
+    user: Optional[dict[str, Any]] = Depends(require_user),
 ):
     dashboard = analyze_scenario(request=request, db=db)
-    return save_dashboard_to_history(dashboard, db)
+    return save_dashboard_to_history(dashboard, db, user_id=_user_id(user))
 
 
 @router.get("/scenario-history", response_model=ScenarioHistoryResponse)
-def list_scenario_history_route(db: Session = Depends(get_db)):
-    return list_saved_scenarios(db)
+def list_scenario_history_route(
+    db: Session = Depends(get_db),
+    user: Optional[dict[str, Any]] = Depends(require_user),
+):
+    return list_saved_scenarios(db, user_id=_user_id(user))
 
 
 @router.delete("/scenario-history", response_model=ScenarioHistoryResponse)
-def clear_scenario_history_route(db: Session = Depends(get_db)):
-    return clear_saved_scenarios(db)
+def clear_scenario_history_route(
+    db: Session = Depends(get_db),
+    user: Optional[dict[str, Any]] = Depends(require_user),
+):
+    return clear_saved_scenarios(db, user_id=_user_id(user))
 
 
 @router.post("/scenario-history/compare", response_model=ScenarioComparisonResponse)
-def compare_scenario_history_route(db: Session = Depends(get_db)):
-    return compare_saved_scenarios(db)
+def compare_scenario_history_route(
+    db: Session = Depends(get_db),
+    user: Optional[dict[str, Any]] = Depends(require_user),
+):
+    return compare_saved_scenarios(db, user_id=_user_id(user))
 
 
 @router.get("/municipalities")

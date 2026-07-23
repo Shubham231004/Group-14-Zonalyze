@@ -18,6 +18,9 @@ class ScenarioHistoryRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     scenario_id = Column(String(64), unique=True, nullable=False, index=True)
     saved_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Clerk user id (JWT `sub`). NULL when auth is disabled — those rows form the
+    # shared anonymous history, matching the pre-auth behaviour.
+    user_id = Column(String(191), nullable=True, index=True)
 
     municipality_name = Column(String(120), nullable=False, index=True)
     business_subcategory = Column(String(160), nullable=False, index=True)

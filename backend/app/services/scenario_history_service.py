@@ -122,16 +122,21 @@ def _record_from_item(item: ScenarioHistoryItem) -> ScenarioHistoryRecord:
     )
 
 
-def save_dashboard_to_history(dashboard: DashboardSummaryResponse, db: Session) -> ScenarioHistoryItem:
+def save_dashboard_to_history(
+    dashboard: DashboardSummaryResponse, db: Session, user_id: str | None = None
+) -> ScenarioHistoryItem:
     item = _history_item_from_dashboard(dashboard)
     record = _record_from_item(item)
+    record.user_id = user_id
     db.add(record)
     db.commit()
     db.refresh(record)
 
-    # Keep the table small for prototype use. Newest 25 are kept.
+    # Keep each user's history small. Newest 25 are kept (== None -> IS NULL,
+    # i.e. the shared anonymous history when auth is off).
     older_records = (
         db.query(ScenarioHistoryRecord)
+        .filter(ScenarioHistoryRecord.user_id == user_id)
         .order_by(ScenarioHistoryRecord.saved_at.desc(), ScenarioHistoryRecord.id.desc())
         .offset(_MAX_HISTORY_ITEMS)
         .all()
@@ -144,9 +149,10 @@ def save_dashboard_to_history(dashboard: DashboardSummaryResponse, db: Session) 
     return _history_item_from_record(record)
 
 
-def list_saved_scenarios(db: Session) -> ScenarioHistoryResponse:
+def list_saved_scenarios(db: Session, user_id: str | None = None) -> ScenarioHistoryResponse:
     records = (
         db.query(ScenarioHistoryRecord)
+        .filter(ScenarioHistoryRecord.user_id == user_id)
         .order_by(ScenarioHistoryRecord.saved_at.desc(), ScenarioHistoryRecord.id.desc())
         .limit(_MAX_HISTORY_ITEMS)
         .all()
@@ -155,8 +161,8 @@ def list_saved_scenarios(db: Session) -> ScenarioHistoryResponse:
     return ScenarioHistoryResponse(count=len(items), scenarios=items)
 
 
-def clear_saved_scenarios(db: Session) -> ScenarioHistoryResponse:
-    db.query(ScenarioHistoryRecord).delete()
+def clear_saved_scenarios(db: Session, user_id: str | None = None) -> ScenarioHistoryResponse:
+    db.query(ScenarioHistoryRecord).filter(ScenarioHistoryRecord.user_id == user_id).delete()
     db.commit()
     return ScenarioHistoryResponse(count=0, scenarios=[])
 
@@ -200,8 +206,8 @@ def _tradeoff_text(item: ScenarioHistoryItem) -> str:
     return "; ".join(parts) + "."
 
 
-def compare_saved_scenarios(db: Session) -> ScenarioComparisonResponse:
-    scenarios = list_saved_scenarios(db).scenarios
+def compare_saved_scenarios(db: Session, user_id: str | None = None) -> ScenarioComparisonResponse:
+    scenarios = list_saved_scenarios(db, user_id=user_id).scenarios
     generated_at = _now_iso()
 
     if len(scenarios) == 0:
