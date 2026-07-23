@@ -64,7 +64,6 @@ import ScenarioAIChat from "@/components/ScenarioAIChat";
 import ScenarioSupportPanel from "@/components/ScenarioSupportPanel";
 import BusinessResolverPanel, {
   type BusinessInputMode,
-  type BusinessResolutionResponse,
 } from "@/components/BusinessResolverPanel";
 
 import OperatingProfilePanel from "@/components/OperatingProfilePanel";
@@ -82,8 +81,10 @@ import {
   fetchGeospatialMarketMap,
   fetchScenarioHistory,
   generateFeasibilityReport,
+  resolveBusiness,
   runSystemValidation,
   saveScenarioToHistory,
+  type BusinessResolutionResponse,
   type BusinessSubcategoryOption,
   type DashboardSummaryResponse,
   type GeospatialMarketContext,
@@ -424,6 +425,39 @@ export default function Dashboard() {
       if (seq === geoRequestSeq.current) setIsGeoLoading(false);
     }
   }, []);
+
+  // One pick-or-type business field: a catalog pick runs the ML-safe path; a typed
+  // idea drives the map via business_query and is resolved so the nearest trained
+  // type can produce a (clearly-labelled) feasibility score.
+  const handleBusinessChange = useCallback(
+    (value: string) => {
+      const isCatalog = businessOptions.some((b) => b.business_subcategory === value);
+      if (isCatalog || !value.trim()) {
+        setBusinessInputMode("catalog");
+        setBusinessSubcategory(value);
+        setUseCustomBusinessForMap(false);
+        setCustomBusinessQuery("");
+        setBusinessResolution(null);
+        return;
+      }
+      setBusinessInputMode("custom");
+      setCustomBusinessQuery(value.trim());
+      setUseCustomBusinessForMap(true);
+      resolveBusiness({ business_query: value.trim(), municipality_name: municipalityName })
+        .then(setBusinessResolution)
+        .catch(() => setBusinessResolution(null));
+    },
+    [businessOptions, municipalityName],
+  );
+
+  // Score wiring: a resolved free-text idea scores off its nearest trained type,
+  // so the existing analyze-scenario calls (which read businessSubcategory) get it
+  // for free. The map still uses business_query (shouldUseCustomBusinessMap).
+  useEffect(() => {
+    if (businessInputMode === "custom" && businessResolution?.nearest_catalog_subcategory) {
+      setBusinessSubcategory(businessResolution.nearest_catalog_subcategory);
+    }
+  }, [businessInputMode, businessResolution]);
 
   useEffect(() => {
     async function loadStartupData() {
@@ -918,18 +952,22 @@ export default function Dashboard() {
 
                 <div className="space-y-2">
                   <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                    <Store className="w-3.5 h-3.5" /> Business Subcategory
+                    <Store className="w-3.5 h-3.5" /> Business — pick one or type any idea
                   </label>
                   <SearchableSelect
-                    value={businessSubcategory}
-                    onValueChange={setBusinessSubcategory}
+                    value={businessInputMode === "custom" ? customBusinessQuery : businessSubcategory}
+                    onValueChange={handleBusinessChange}
                     options={businessOptions.map((business) => ({
                       value: business.business_subcategory,
                       label: business.label,
                     }))}
-                    placeholder="Select business"
-                    searchPlaceholder="Search business types..."
+                    placeholder="Select or type a business idea"
+                    searchPlaceholder="Search types, or type any idea (e.g. Tim Hortons)…"
+                    allowCustomValue
                   />
+                  {businessInputMode === "custom" && businessResolution?.score_basis_note ? (
+                    <p className="text-[10px] text-primary/80">{businessResolution.score_basis_note}</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">

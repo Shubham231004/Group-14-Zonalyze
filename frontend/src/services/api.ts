@@ -507,6 +507,12 @@ export interface BusinessResolutionResponse {
   warnings: string[];
   next_steps: string[];
   raw_ai_error?: string | null;
+  // Nearest trained catalog type for a free-text idea, so the ML score can run
+  // (clearly labelled). null when nothing matched.
+  nearest_catalog_subcategory?: string | null;
+  nearest_catalog_confidence?: number;
+  score_basis?: "exact_catalog" | "nearest_catalog" | "unavailable" | string;
+  score_basis_note?: string;
 }
 
 export interface RegisteredSensorsResponse {
