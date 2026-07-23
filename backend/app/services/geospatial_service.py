@@ -414,6 +414,8 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
                 business_subcategory=score_subcategory,
                 radius_km=radius_km,
                 features=features,
+                center_lat=center_lat,
+                center_lon=center_lng,
             )
             lease = get_lease_cost_evidence(
                 municipality_name=census_municipality,

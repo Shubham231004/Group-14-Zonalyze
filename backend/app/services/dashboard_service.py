@@ -71,11 +71,18 @@ def analyze_scenario(request: AnalyzeScenarioRequest, db: Session) -> DashboardS
         features=features,
     )
 
+    # City-centre coords let demand ground its transit/foot-traffic indices in the
+    # real POI store (reuses the same municipality-centre resolver as the map).
+    from app.services.geospatial_service import _center_for_municipality
+
+    demand_center_lat, demand_center_lon = _center_for_municipality(request.municipality_name)
     demand_evidence = get_demand_evidence(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
         features=features,
+        center_lat=demand_center_lat,
+        center_lon=demand_center_lon,
     )
 
     predictor = get_predictor()

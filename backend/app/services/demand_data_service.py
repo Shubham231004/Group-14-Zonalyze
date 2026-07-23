@@ -101,6 +101,46 @@ def _fallback_from_features(
     )
 
 
+def _index_from_count(count: int, base: float, per_unit: float) -> float:
+    """Transparent count -> 0..100 index (saturating). The honest signal is the
+    raw count (stated in the note); the index is just a convenience scale."""
+    return round(min(100.0, base + count * per_unit), 2)
+
+
+def _ground_demand_from_store(
+    evidence: DemandEvidence, center_lat: float, center_lon: float, radius_km: float
+) -> DemandEvidence:
+    """Replace the proxy transit/foot-traffic indices with values derived from the
+    real owned POI store (transit stops + commercial POIs in the radius). Only the
+    local store is used — never live Overpass — so this is fast and offline-safe.
+    Returns the evidence unchanged if the store isn't imported yet."""
+    from app.services.osm_service import COMMERCIAL_ACTIVITY_TAGS, TRANSIT_TAGS
+    from app.services.poi_query_service import fetch_pois_from_db
+
+    transit = fetch_pois_from_db(TRANSIT_TAGS, center_lat, center_lon, radius_km, 300)
+    commercial = fetch_pois_from_db(COMMERCIAL_ACTIVITY_TAGS, center_lat, center_lon, radius_km, 300)
+    if transit is None or commercial is None:
+        return evidence  # store not available -> keep the feature-derived proxy
+
+    transit_count, commercial_count = len(transit), len(commercial)
+    transit_index = _index_from_count(transit_count, 15.0, 2.5)
+    foot_traffic = _index_from_count(commercial_count, 20.0, 3.0)
+    return evidence.model_copy(
+        update={
+            "transit_access_proxy_index": transit_index,
+            "foot_traffic_proxy_index": foot_traffic,
+            "daytime_activity_index": round(min(100.0, foot_traffic * 0.6 + transit_index * 0.4), 2),
+            "method": evidence.method if "osm_grounded" in evidence.method else f"{evidence.method}+osm_grounded",
+            "credibility": "medium-high",
+            "data_quality_note": (
+                f"Transit access and foot-traffic are derived from real OpenStreetMap coverage in the "
+                f"Zonalyze POI store: {transit_count} transit stops and {commercial_count} commercial POIs "
+                f"within {radius_km:g} km of the analysed point."
+            ),
+        }
+    )
+
+
 def load_demand_observations() -> pd.DataFrame:
     if not DEMAND_OBSERVATIONS_PATH.exists():
         return pd.DataFrame()
@@ -115,6 +155,20 @@ def list_demand_observations() -> List[DemandEvidence]:
 
 
 def get_demand_evidence(
+    municipality_name: str,
+    business_subcategory: str,
+    radius_km: float,
+    features: Dict[str, Any],
+    center_lat: float | None = None,
+    center_lon: float | None = None,
+) -> DemandEvidence:
+    evidence = _resolve_demand_evidence(municipality_name, business_subcategory, radius_km, features)
+    if center_lat is not None and center_lon is not None:
+        evidence = _ground_demand_from_store(evidence, center_lat, center_lon, radius_km)
+    return evidence
+
+
+def _resolve_demand_evidence(
     municipality_name: str,
     business_subcategory: str,
     radius_km: float,
@@ -174,3 +228,15 @@ def apply_demand_evidence_to_features(
     updated["demand_data_credibility"] = evidence.credibility
     updated["demand_level"] = evidence.demand_level
     return updated
+
+
+def _demo() -> None:
+    # ponytail check: the count->index mapping and saturation must hold.
+    assert _index_from_count(0, 15.0, 2.5) == 15.0
+    assert _index_from_count(10, 15.0, 2.5) == 40.0
+    assert _index_from_count(100, 15.0, 2.5) == 100.0  # saturates at 100
+    print("demand_data_service demo OK")
+
+
+if __name__ == "__main__":
+    _demo()
