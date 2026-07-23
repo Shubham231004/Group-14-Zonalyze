@@ -108,7 +108,10 @@ def _decision_score(features: Dict[str, Any], prediction: Dict[str, Any]) -> flo
         - _risk_penalty(str(prediction.get("predicted_risk_class")))
         + _recommendation_bonus(str(prediction.get("recommendation")))
     )
-    return round(max(0.0, min(100.0, score)), 2)
+    # Floor at -100, not 0: weak scenarios (high risk, negative revenue) all used
+    # to flatten to 0.0, which erased the relative ranking. A negative score is
+    # honest — it means "below viability" — and options still rank against each other.
+    return round(max(-100.0, min(100.0, score)), 2)
 
 
 def _strengths_and_concerns(features: Dict[str, Any], prediction: Dict[str, Any]) -> Tuple[List[str], List[str]]:

@@ -68,7 +68,6 @@ import BusinessResolverPanel, {
 
 import OperatingProfilePanel from "@/components/OperatingProfilePanel";
 import LocationComparisonPanel from "@/components/LocationComparisonPanel";
-import SiteAddressAnalysisPanel from "@/components/SiteAddressAnalysisPanel";
 
 import {
   analyzeScenario,
@@ -1485,15 +1484,7 @@ export default function Dashboard() {
                       onRetry={() => loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest)}
                     />
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Site Address Panel */}
-                      <SiteAddressAnalysisPanel
-                        municipalityName={municipalityName}
-                        businessSubcategory={businessSubcategory}
-                        businessQuery={customBusinessQuery}
-                        radiusKm={radius[0]}
-                      />
-                      
+                    <div className="grid grid-cols-1 gap-6">
                       {/* Spatial Support Level */}
                       <ScenarioSupportPanel
                         municipalityName={municipalityName}

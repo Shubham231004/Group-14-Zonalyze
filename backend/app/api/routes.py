@@ -19,6 +19,7 @@ from app.schemas.demand import DemandEvidenceCatalogResponse, DemandEvidence
 from app.schemas.recommendation import RecommendationDecision
 from app.schemas.scenario_history import ScenarioComparisonResponse, ScenarioHistoryItem, ScenarioHistoryResponse
 from app.schemas.geospatial import GeospatialMarketContext, GeospatialMarketRequest
+from app.schemas.location_comparison import LocationComparisonRequest, LocationComparisonResponse
 from app.schemas.site_address import SiteAddressAnalysisRequest, SiteAddressAnalysisResponse
 from app.schemas.sensor_packet import SensorPacket
 from app.schemas.ai_assistant import LocalAIStatusResponse, ScenarioChatRequest, ScenarioChatResponse
@@ -34,6 +35,7 @@ from app.services.ai_assistant_service import answer_scenario_question
 from app.services.local_ai_service import get_local_ai_status
 from app.services.catalog_service import get_municipalities, get_business_subcategories
 from app.services.dashboard_service import get_dashboard_summary, analyze_scenario
+from app.services.location_comparison_service import compare_locations
 from app.services.message_bus_service import (
     get_registered_sensors,
     get_latest_packet,
@@ -177,6 +179,12 @@ def operating_profile_route(request: OperatingProfileRequest):
 def scenario_support_coverage_route(request: ScenarioSupportRequest):
     return evaluate_scenario_support(request)
 
+@router.post("/scenario/location-comparison", response_model=LocationComparisonResponse)
+def location_comparison_route(request: LocationComparisonRequest):
+    # Compare Locations: the service/schemas existed but this route was never
+    # registered, so the frontend's call 404'd. Wiring it fixes the feature.
+    return compare_locations(request)
+
 @router.post("/recommendation/decision", response_model=RecommendationDecision)
 def recommendation_decision_route(request: AnalyzeScenarioRequest):
     features = build_prediction_features(
@@ -247,16 +255,33 @@ def competition_observations_route():
 
 @router.post("/market/competition-evidence", response_model=CompetitionObservationEvidence | None)
 def competition_evidence_route(request: AnalyzeScenarioRequest):
+    # Same store-first source as the map/dashboard so this endpoint never
+    # disagrees with them (it used to return the seed, or null when no seed row).
+    from app.services.competition_data_service import build_osm_competition_evidence
+    from app.services.geospatial_service import _center_for_municipality
+    from app.services.osm_service import fetch_osm_competitors
+
     features = build_prediction_features(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
     )
-    return get_competition_observation(
+    population = float(features.get("population_2021", 0) or 0)
+    center_lat, center_lon = _center_for_municipality(request.municipality_name)
+    osm_competitors = fetch_osm_competitors(
+        request.business_subcategory, center_lat, center_lon, request.radius_km, store_only=True
+    )
+    return build_osm_competition_evidence(
+        municipality_name=request.municipality_name,
+        business_subcategory=request.business_subcategory,
+        population=population,
+        osm_elements=osm_competitors.elements,
+        is_live=osm_competitors.status == "live_osm",
+    ) or get_competition_observation(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
-        population=float(features.get("population_2021", 0) or 0),
+        population=population,
     )
 
 
@@ -298,17 +323,24 @@ def demand_observations_route():
 
 @router.post("/market/demand-evidence", response_model=DemandEvidence)
 def demand_evidence_route(request: AnalyzeScenarioRequest):
+    # Pass city-centre coords so the indices ground in the real POI store, same
+    # as the dashboard/map (it used to return the ungrounded proxy).
+    from app.services.geospatial_service import _center_for_municipality
+
     features = build_prediction_features(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
     )
     features["municipality_name"] = request.municipality_name
+    center_lat, center_lon = _center_for_municipality(request.municipality_name)
     return get_demand_evidence(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
         features=features,
+        center_lat=center_lat,
+        center_lon=center_lon,
     )
 
 

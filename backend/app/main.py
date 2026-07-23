@@ -72,7 +72,9 @@ if RATE_LIMIT_ENABLED:
         from slowapi.middleware import SlowAPIMiddleware
         from slowapi.util import get_remote_address
 
-        limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT])
+        # application_limits (not default_limits) is what SlowAPIMiddleware enforces
+        # globally per client IP; default_limits only apply to @limiter.limit routes.
+        limiter = Limiter(key_func=get_remote_address, application_limits=[RATE_LIMIT])
         app.state.limiter = limiter
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
         app.add_middleware(SlowAPIMiddleware)
