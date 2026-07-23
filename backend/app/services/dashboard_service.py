@@ -57,11 +57,32 @@ def analyze_scenario(request: AnalyzeScenarioRequest, db: Session) -> DashboardS
     )
     features["municipality_name"] = request.municipality_name
 
-    competition_evidence = get_competition_observation(
+    # City-centre coords let the AI-facing evidence (chat, Evidence tab, snapshot)
+    # use the SAME real POI store as the map — real competitors + real
+    # transit/foot-traffic — instead of seed proxies. Same resolver as the map.
+    from app.services.competition_data_service import build_osm_competition_evidence
+    from app.services.geospatial_service import _center_for_municipality
+    from app.services.osm_service import fetch_osm_competitors
+
+    center_lat, center_lon = _center_for_municipality(request.municipality_name)
+    population = float(features.get("population_2021", 0) or 0)
+
+    # Real competition from the owned POI store; falls back to the seed observation
+    # when the store isn't imported (build_osm_competition_evidence returns None).
+    osm_competitors = fetch_osm_competitors(
+        request.business_subcategory, center_lat, center_lon, request.radius_km, store_only=True
+    )
+    competition_evidence = build_osm_competition_evidence(
+        municipality_name=request.municipality_name,
+        business_subcategory=request.business_subcategory,
+        population=population,
+        osm_elements=osm_competitors.elements,
+        is_live=osm_competitors.status == "live_osm",
+    ) or get_competition_observation(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
-        population=float(features.get("population_2021", 0) or 0),
+        population=population,
     )
 
     lease_cost_evidence = get_lease_cost_evidence(
@@ -71,18 +92,13 @@ def analyze_scenario(request: AnalyzeScenarioRequest, db: Session) -> DashboardS
         features=features,
     )
 
-    # City-centre coords let demand ground its transit/foot-traffic indices in the
-    # real POI store (reuses the same municipality-centre resolver as the map).
-    from app.services.geospatial_service import _center_for_municipality
-
-    demand_center_lat, demand_center_lon = _center_for_municipality(request.municipality_name)
     demand_evidence = get_demand_evidence(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
         features=features,
-        center_lat=demand_center_lat,
-        center_lon=demand_center_lon,
+        center_lat=center_lat,
+        center_lon=center_lon,
     )
 
     predictor = get_predictor()

@@ -639,16 +639,26 @@ def _fetch_pois_or_overpass(
     limit: int,
     query: str,
     cache_key: str,
+    store_only: bool = False,
 ) -> OSMFetchResult:
     """Local PostGIS POI store first (owned, no rate limits); Overpass only if the
     store isn't available yet. Reuses status='live_osm' so downstream relevance
-    filtering/evidence is unchanged (the note states the real source)."""
+    filtering/evidence is unchanged (the note states the real source).
+
+    store_only=True skips the Overpass fallback entirely — for frequent callers
+    (the dashboard) that must never wait on a live network call."""
     elements = poi_query_service.fetch_pois_from_db(query_tags, center_lat, center_lon, radius_km, limit)
     if elements is not None:  # store answered (even 0 rows = a real "none nearby")
         return OSMFetchResult(
             status="live_osm",
             note="OpenStreetMap POIs served from Zonalyze's local PostGIS mirror (no live Overpass call).",
             elements=elements,
+        )
+    if store_only:
+        return OSMFetchResult(
+            status="fallback_proxy",
+            note="Local POI store not imported yet; skipped live Overpass for this call.",
+            elements=[],
         )
     return _fetch_overpass(query, cache_key)
 
@@ -700,6 +710,7 @@ def fetch_osm_competitors(
     center_lon: float,
     radius_km: float,
     limit: int = 60,
+    store_only: bool = False,
 ) -> OSMFetchResult:
     catalog_tags = get_osm_tags_for_subcategory(business_subcategory)
     rule = _rule_for_subcategory(business_subcategory)
@@ -707,7 +718,7 @@ def fetch_osm_competitors(
 
     query = build_overpass_query(query_tags, center_lat, center_lon, radius_km, limit=max(limit, 80))
     cache_key = f"competitors:v2:{business_subcategory}:{center_lat:.4f}:{center_lon:.4f}:{radius_km}:{limit}"
-    result = _fetch_pois_or_overpass(query_tags, center_lat, center_lon, radius_km, max(limit, 80), query, cache_key)
+    result = _fetch_pois_or_overpass(query_tags, center_lat, center_lon, radius_km, max(limit, 80), query, cache_key, store_only=store_only)
 
     normalized: List[Dict] = []
     seen = set()
