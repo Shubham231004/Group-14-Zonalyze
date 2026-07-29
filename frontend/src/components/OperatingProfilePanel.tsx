@@ -118,13 +118,13 @@ export default function OperatingProfilePanel({
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            AI Benchmark Operating Profile
+            Operating cost guide
           </p>
           <h3 className="mt-1 text-lg font-semibold text-foreground">
             Estimated operating assumptions for {activeBusinessLabel}
           </h3>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            BestSpot estimates lease, space, staffing, customer economics, utilities, and marketing as planning ranges. These are not user-entered costs and are not hardcoded formulas; the backend asks the local AI estimator to generate a structured benchmark using available scenario context.
+            Planning ranges for lease, space, staffing, customer economics, utilities, and marketing — grounded in the active business and location. Treat them as a starting point, then confirm with local quotes.
           </p>
         </div>
         <button

@@ -1,198 +1,123 @@
 import { SignIn } from "@clerk/clerk-react";
-import { MapPin, Wallet, Scale, MessageCircleQuestion, Trophy } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  Bot,
+  Building2,
+  Check,
+  CircleDollarSign,
+  Map,
+  MapPin,
+  Scale,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  Users,
+} from "lucide-react";
 
-/**
- * BestSpot public landing — what a signed-out visitor sees.
- *
- * Design intent: a nervous first-time (or fifth-time) owner arrives full of
- * questions — "will it work? what will it cost? who's already there?" — and the
- * page answers them visually in seconds, then hands them the sign-in.
- * Editorial-cartography brand: warm paper, ink, the red pin.
- */
-
-/* A hand-built map vignette — paper, streets, radius, pins, verdict. */
-function MapVignette() {
+function BrandLockup({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="relative w-full aspect-[4/3] rounded-2xl border border-border bg-card overflow-hidden shadow-[0_24px_60px_-24px_rgba(33,29,26,0.25)]">
-      {/* street grid */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 300" aria-hidden>
-        <g stroke="hsl(33 20% 88%)" strokeWidth="6" strokeLinecap="round">
-          <path d="M0 80 H400" />
-          <path d="M0 170 H400" />
-          <path d="M0 245 H400" />
-          <path d="M90 0 V300" />
-          <path d="M210 0 V300" />
-          <path d="M320 0 V300" />
-        </g>
-        <g stroke="hsl(33 20% 92%)" strokeWidth="3" strokeLinecap="round">
-          <path d="M0 40 H400" />
-          <path d="M0 125 H400" />
-          <path d="M150 0 V300" />
-          <path d="M265 0 V300" />
-        </g>
-        {/* park + water for warmth */}
-        <rect x="222" y="182" width="86" height="52" rx="10" fill="hsl(140 30% 88%)" />
-        <path d="M0 262 Q120 240 400 278 L400 300 L0 300 Z" fill="hsl(200 45% 90%)" />
-        {/* the analysis radius */}
-        <circle cx="176" cy="140" r="92" fill="hsl(4 71% 50% / 0.07)" stroke="hsl(4 71% 50% / 0.75)" strokeWidth="2.5" strokeDasharray="1 0" />
-      </svg>
+    <a href="#top" className="group inline-flex items-center gap-2.5" aria-label="BestSpot home">
+      <span className={`brand-pin ${compact ? "text-2xl" : "text-3xl"}`} aria-hidden />
+      <span className="font-display text-xl font-semibold tracking-tight">
+        BestSpot<span className="font-sans text-[11px] font-semibold text-primary">.biz</span>
+      </span>
+    </a>
+  );
+}
 
-      {/* your spot */}
-      <span className="brand-pin pin-drop absolute text-5xl" style={{ left: "41%", top: "40%" }} aria-hidden />
-      {/* competitors */}
-      {[
-        { left: "28%", top: "26%" },
-        { left: "55%", top: "31%" },
-        { left: "33%", top: "58%" },
-        { left: "60%", top: "55%" },
-      ].map((pos, i) => (
-        <span
-          key={i}
-          className="brand-pin absolute text-2xl opacity-55"
-          style={{ ...pos, animation: `rise-in 0.5s ${0.55 + i * 0.12}s both` }}
-          aria-hidden
-        />
-      ))}
+function ProductMapPreview() {
+  const competitors = [
+    { name: "Daily Bread", left: "24%", top: "27%" },
+    { name: "Crumb & Co.", left: "71%", top: "24%" },
+    { name: "Baker Street", left: "63%", top: "66%" },
+    { name: "Morning Loaf", left: "29%", top: "71%" },
+  ];
 
-      {/* verdict chip */}
-      <div className="absolute right-4 top-4 rise-in rounded-xl border border-accent/30 bg-card px-3.5 py-2.5 shadow-md" style={{ animationDelay: "1.1s" }}>
-        <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">Verdict</p>
-        <p className="font-display text-accent text-lg font-semibold leading-tight">Worth it ✓</p>
-        <p className="text-[10px] text-muted-foreground">4 competitors · demand strong</p>
+  return (
+    <div className="map-preview-shell" aria-label="Example BestSpot competition map for a bakery">
+      <div className="map-preview-toolbar">
+        <div><p className="eyebrow">Live decision preview</p><p className="mt-1 text-sm font-semibold text-foreground">Independent bakery · Waterloo</p></div>
+        <span className="status-chip"><span className="status-dot" />Real map view</span>
       </div>
-
-      {/* comparison chip */}
-      <div className="absolute left-4 bottom-4 rise-in rounded-xl border border-border bg-card px-3.5 py-2.5 shadow-md" style={{ animationDelay: "1.3s" }}>
-        <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">Best spots for a bakery</p>
-        <div className="mt-1 space-y-0.5 text-[11px] font-mono">
-          <p className="text-foreground">1. Waterloo <span className="text-accent font-semibold">82</span></p>
-          <p className="text-muted-foreground">2. Kitchener 74</p>
-          <p className="text-muted-foreground">3. Guelph 61</p>
+      <div className="map-preview-canvas">
+        <div className="map-road map-road-a" /><div className="map-road map-road-b" /><div className="map-road map-road-c" /><div className="map-road map-road-d" />
+        <div className="map-park"><span>Victoria Park</span></div>
+        <div className="map-building building-a" /><div className="map-building building-b" /><div className="map-building building-c" /><div className="map-catchment" />
+        {competitors.map((competitor) => (
+          <div key={competitor.name} className="map-competitor" style={{ left: competitor.left, top: competitor.top }} title={competitor.name}><Store className="h-3.5 w-3.5" /></div>
+        ))}
+        <div className="map-hero-pin" aria-label="Recommended area"><MapPin className="h-7 w-7 fill-primary text-primary" /><span>Best area</span></div>
+        <div className="map-score-card">
+          <div className="score-orbit"><strong>82</strong><span>/100</span></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-accent">Strong fit</p><p className="mt-0.5 text-[11px] text-muted-foreground">Demand beats competition</p></div>
         </div>
+        <div className="map-legend-card"><span><i className="legend-pin" /> Your best area</span><span><i className="legend-store" /> 4 competitors</span></div>
       </div>
     </div>
   );
 }
 
 const QUESTIONS = [
-  {
-    icon: MapPin,
-    q: "Who's already there?",
-    a: "Every competitor near your spot, pinned on a real map.",
-  },
-  {
-    icon: Wallet,
-    q: "What will it cost me?",
-    a: "Rent, staff, and running costs — estimated in plain dollars.",
-  },
-  {
-    icon: Scale,
-    q: "Will it actually work?",
-    a: "A straight verdict with a score, not a maybe.",
-  },
+  { icon: MapPin, question: "Who is already nearby?", answer: "See competitors around the exact address, not just a city average." },
+  { icon: Users, question: "Are my customers there?", answer: "Understand the people, activity, and demand inside your catchment." },
+  { icon: CircleDollarSign, question: "What could it cost?", answer: "Plan with local lease and operating ranges before committing." },
+  { icon: Scale, question: "Is this my best option?", answer: "Compare cities and radiuses with the same decision score." },
+];
+
+const STEPS = [
+  { number: "01", icon: Search, title: "Describe the idea", copy: "Choose any Ontario city, address, business type, and customer radius." },
+  { number: "02", icon: Map, title: "See the market", copy: "BestSpot maps competitors and reads demand, population, and cost evidence." },
+  { number: "03", icon: BarChart3, title: "Choose with confidence", copy: "Get a clear score, trade-offs, and a ranked comparison of other spots." },
 ];
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* nav */}
-      <header className="max-w-6xl mx-auto px-6 pt-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="brand-pin text-2xl" aria-hidden />
-          <span className="font-display text-xl font-semibold">BestSpot</span>
-        </div>
-        <a
-          href="#signin"
-          className="text-sm font-semibold text-foreground border border-border rounded-full px-4 py-1.5 hover:border-primary hover:text-primary transition-colors"
-        >
-          Sign in
-        </a>
+    <div id="top" className="min-h-screen bg-background text-foreground">
+      <header className="landing-nav">
+        <BrandLockup compact />
+        <nav className="hidden items-center gap-7 md:flex" aria-label="Main navigation">
+          <a href="#answers" className="nav-link">What you learn</a><a href="#how-it-works" className="nav-link">How it works</a><a href="#compare" className="nav-link">Compare spots</a>
+        </nav>
+        <a href="#signin" className="button-secondary">Sign in<ArrowRight className="h-3.5 w-3.5" /></a>
       </header>
-
-      {/* hero */}
-      <main className="max-w-6xl mx-auto px-6">
-        <section className="grid lg:grid-cols-2 gap-12 items-center pt-14 pb-10">
-          <div className="space-y-7">
-            <h1 className="rise-in font-display font-semibold text-5xl md:text-6xl leading-[1.04] tracking-tight">
-              Find your best spot
-              <span className="brand-pin pin-drop text-4xl md:text-5xl ml-2" aria-hidden />
-              <br />
-              <span className="text-muted-foreground">for your next business.</span>
-            </h1>
-            <p className="rise-in text-lg text-muted-foreground max-w-md leading-relaxed" style={{ animationDelay: "0.15s" }}>
-              First café or fourth franchise — pick a spot on the map, name your idea,
-              and get a straight answer{" "}
-              <span className="text-foreground font-medium">before you sign a lease</span>.
-            </p>
-
-            {/* the questions in their head, answered */}
-            <div className="rise-in space-y-3 pt-1" style={{ animationDelay: "0.3s" }}>
-              {QUESTIONS.map(({ icon: Icon, q, a }) => (
-                <div key={q} className="flex items-start gap-3.5">
-                  <div className="mt-0.5 rounded-lg bg-primary/8 border border-primary/15 p-2">
-                    <Icon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-display font-semibold text-[17px] leading-snug">{q}</p>
-                    <p className="text-sm text-muted-foreground">{a}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+      <main>
+        <section className="landing-hero page-shell">
+          <div className="hero-copy">
+            <div className="trust-kicker rise-in"><ShieldCheck className="h-4 w-4" />Location decisions for Ontario business owners</div>
+            <h1 className="rise-in hero-title" style={{ animationDelay: "80ms" }}>Find the best spot<span className="hero-pin-word"><span className="brand-pin pin-drop" aria-hidden /></span><span>for your next business.</span></h1>
+            <p className="rise-in hero-description" style={{ animationDelay: "150ms" }}>Before you sign a lease, see the competition, understand the costs, and compare where your idea has the strongest chance to work.</p>
+            <div className="rise-in flex flex-wrap gap-3" style={{ animationDelay: "220ms" }}><a href="#signin" className="button-primary">Check a location<ArrowRight className="h-4 w-4" /></a><a href="#how-it-works" className="button-quiet">See how it works</a></div>
+            <div className="rise-in hero-proof" style={{ animationDelay: "280ms" }}><span><Check className="h-3.5 w-3.5" /> Takes about a minute</span><span><Check className="h-3.5 w-3.5" /> Real market evidence</span><span><Check className="h-3.5 w-3.5" /> Plain-language answers</span></div>
           </div>
-
-          <div className="rise-in" style={{ animationDelay: "0.25s" }}>
-            <MapVignette />
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              Real map · real competitors · real census data — this is what your answer looks like.
-            </p>
+          <div className="rise-in hero-visual" style={{ animationDelay: "180ms" }}>
+            <div className="visual-orbit visual-orbit-one" /><div className="visual-orbit visual-orbit-two" /><ProductMapPreview />
+            <div className="floating-note floating-note-top"><Building2 className="h-4 w-4 text-primary" /><span><strong>4</strong> nearby competitors</span></div>
+            <div className="floating-note floating-note-bottom"><Sparkles className="h-4 w-4 text-accent" /><span>Better than <strong>2 nearby cities</strong></span></div>
           </div>
         </section>
-
-        {/* the best-spot promise */}
-        <section className="py-10 border-t border-border">
-          <div className="grid md:grid-cols-[auto_1fr] gap-6 items-center max-w-3xl mx-auto">
-            <div className="rounded-2xl bg-primary/8 border border-primary/15 p-4 justify-self-center">
-              <Trophy className="w-8 h-8 text-primary" />
-            </div>
-            <div>
-              <h2 className="font-display text-2xl md:text-3xl font-semibold leading-snug">
-                We don't just check one spot.
-                <span className="text-primary"> We find your best one.</span>
-              </h2>
-              <p className="mt-2 text-muted-foreground text-sm md:text-base">
-                BestSpot compares nearby cities and distances with the same numbers, ranks
-                them, and tells you where your idea wins — with an assistant that answers
-                your questions in plain language.
-                <MessageCircleQuestion className="inline w-4 h-4 ml-1.5 -mt-0.5 text-primary" />
-              </p>
-            </div>
+        <section className="proof-bar" aria-label="Data sources"><div className="page-shell proof-bar-inner"><p>One decision view, built from:</p><span>Competition</span><span>Local demand</span><span>Population</span><span>Lease ranges</span><span>Transit & activity</span></div></section>
+        <section id="answers" className="page-shell section-space">
+          <div className="section-heading"><p className="eyebrow">The questions already on your mind</p><h2>You bring the idea. BestSpot brings the clarity.</h2><p>No jargon-heavy report to decode. Start with the answers that affect your decision.</p></div>
+          <div className="question-grid">{QUESTIONS.map(({ icon: Icon, question, answer }) => (<article key={question} className="question-card"><div className="icon-tile"><Icon className="h-5 w-5" /></div><h3>{question}</h3><p>{answer}</p></article>))}</div>
+        </section>
+        <section id="how-it-works" className="process-section"><div className="page-shell section-space">
+          <div className="section-heading section-heading-left"><p className="eyebrow">From doubt to a decision</p><h2>See the answer take shape.</h2></div>
+          <div className="process-track">{STEPS.map(({ number, icon: Icon, title, copy }, index) => (<article key={number} className="process-step"><div className="process-number">{number}</div><div className="process-icon"><Icon className="h-5 w-5" /></div><h3>{title}</h3><p>{copy}</p>{index < STEPS.length - 1 && <ArrowRight className="process-arrow h-5 w-5" />}</article>))}</div>
+        </div></section>
+        <section id="compare" className="page-shell section-space comparison-feature">
+          <div className="comparison-copy"><p className="eyebrow">The feature that changes the decision</p><h2>Do not settle for a good spot. Find the best one.</h2><p>Save each location you are considering and compare feasibility, costs, demand, competition, and confidence side by side. The same idea can tell a very different story a few kilometres away.</p><ul className="feature-checks"><li><Check /> Ranked with one consistent score</li><li><Check /> Trade-offs shown in plain language</li><li><Check /> Revisit saved searches at any time</li></ul></div>
+          <div className="ranking-card" aria-label="Example city comparison"><div className="ranking-header"><div><p className="eyebrow">Bakery comparison</p><h3>Three places. One clear leader.</h3></div><Scale className="h-6 w-6 text-primary" /></div>
+            {[{ rank: 1, city: "Waterloo", score: 82, note: "Best overall balance", best: true }, { rank: 2, city: "Kitchener", score: 74, note: "Higher demand, higher cost" }, { rank: 3, city: "Guelph", score: 68, note: "Lower competition, smaller reach" }].map((row) => (
+              <div key={row.city} className={`ranking-row ${row.best ? "ranking-row-best" : ""}`}><span className="rank-number">{row.rank}</span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><strong>{row.city}</strong>{row.best && <span className="best-badge">Best spot</span>}</div><p>{row.note}</p></div><div className="rank-score"><strong>{row.score}</strong><span>/100</span></div></div>
+            ))}
           </div>
         </section>
-
-        {/* sign-in */}
-        <section id="signin" className="py-12 border-t border-border">
-          <div className="max-w-md mx-auto text-center space-y-6">
-            <div>
-              <h2 className="font-display text-3xl font-semibold">See your spot.</h2>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                Free to try. Your first answer takes about a minute.
-              </p>
-            </div>
-            <div className="flex justify-center">
-              <SignIn routing="hash" />
-            </div>
-          </div>
-        </section>
+        <section className="assistant-strip"><div className="page-shell assistant-strip-inner"><div className="assistant-icon"><Bot className="h-6 w-6" /></div><div><p className="eyebrow">Questions do not stop after the score</p><h2>Ask BestSpot anything about your result.</h2></div><p>“Why is the competition score high?” “What happens at a 3 km radius?” Your assistant answers from the active location and its evidence.</p></div></section>
+        <section id="signin" className="page-shell sign-in-section"><div className="sign-in-copy"><BrandLockup /><p className="eyebrow mt-10">Your next location deserves a real answer</p><h2>Start with one spot.</h2><p>Sign in to keep your searches private, save promising locations, and compare them when you are ready.</p><div className="sign-in-trust"><ShieldCheck className="h-5 w-5" /><span>Secure sign-in. We never ask for banking or lease documents.</span></div></div><div className="sign-in-card"><SignIn routing="hash" /></div></section>
       </main>
-
-      <footer className="border-t border-border py-6">
-        <p className="text-center text-xs text-muted-foreground">
-          <span className="brand-pin text-sm mr-1.5" aria-hidden />
-          BestSpot — find your best spot for your next business. Built on real map, census,
-          and market data for Ontario.
-        </p>
-      </footer>
+      <footer className="site-footer"><div className="page-shell site-footer-inner"><BrandLockup compact /><p>Competition, cost, and location clarity for your next Ontario business.</p><span>bestspot.biz</span></div></footer>
     </div>
   );
 }

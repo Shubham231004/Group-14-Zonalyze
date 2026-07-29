@@ -75,7 +75,7 @@ function SectionCard({
       {nextSteps.length > 0 && (
         <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-700">
-            Required before stronger trust
+            What would strengthen this
           </p>
           <ul className="mt-2 space-y-1 text-xs text-amber-700/80">
             {nextSteps.slice(0, 3).map((step, index) => (
@@ -164,13 +164,13 @@ export default function ScenarioSupportPanel({
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-primary">
-            Support coverage
+            Decision coverage
           </p>
           <h3 className="mt-1 text-lg font-semibold text-foreground">
-            Scenario trust gate
+            How strong is the evidence?
           </h3>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            This separates what BestSpot can safely predict from what it can only use for map/evidence support.
+            See which parts of this location check are strongly supported and which need more confirmation.
           </p>
         </div>
 

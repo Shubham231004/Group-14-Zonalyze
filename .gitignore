@@ -29,6 +29,11 @@ build/
 .DS_Store
 Thumbs.db
 
+# Local AI tooling and video-production workspaces
+.agents/
+.claude/
+videos/
+
 # Logs / test artifacts
 *.log
 .pytest_cache/

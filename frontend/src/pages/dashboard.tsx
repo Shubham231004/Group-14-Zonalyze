@@ -671,7 +671,7 @@ export default function Dashboard() {
       const link = document.createElement("a");
 
       link.href = url;
-      link.download = report.filename || "zonalyze-feasibility-report.txt";
+      link.download = report.filename || "bestspot-location-report.txt";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -806,1064 +806,220 @@ export default function Dashboard() {
     }
   };
 
-  if (isInitialLoading || !dashboardData) {
+  if (isInitialLoading) {
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center relative overflow-hidden">
-        <div className="scanline" />
-        <div className="scada-panel px-8 py-6 rounded-2xl flex flex-col items-center gap-4 max-w-sm text-center">
+      <div className="app-loading-shell">
+        <div className="app-loading-card">
           <span className="brand-pin text-5xl" aria-hidden />
-          <div>
-            <h3 className="font-display font-semibold text-foreground text-xl">BestSpot</h3>
-            <p className="text-xs text-muted-foreground mt-1">Loading your market data…</p>
-          </div>
+          <div><h3>BestSpot</h3><p>Preparing your location workspace…</p></div>
+          <div className="loading-track"><span /></div>
         </div>
       </div>
     );
   }
 
-  // --- RENDERING PROGRESS LOADER SCREEN ---
-  if (isAnalyzing) {
+  if (!dashboardData) {
     return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center font-sans p-6 relative overflow-hidden">
-        <div className="scanline" />
-        <div className="absolute top-10 left-10 w-72 h-72 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
-
-        <Card className="scada-panel border-border rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-6">
-          <div className="flex items-center justify-center gap-2 pt-2">
-            <span className="brand-pin text-4xl pin-drop" aria-hidden />
-            <span className="font-display text-3xl font-semibold text-foreground">BestSpot</span>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="text-lg font-display text-foreground">Checking your spot…</h3>
-            <p className="text-xs text-muted-foreground">Mapping competitors, counting customers, running the numbers.</p>
-          </div>
-
-          <div className="space-y-3 pt-2">
-            <div className="w-full h-3 rounded-full bg-muted overflow-hidden border border-border p-0.5">
-              <div
-                className="h-full bg-primary rounded-full transition-all duration-100 ease-out"
-                style={{ width: `${loadingProgress}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-xs font-mono text-muted-foreground">
-              <span className="lcd-text text-primary">Progress</span>
-              <span>{loadingProgress}%</span>
-            </div>
-          </div>
-
-          <div className="bg-card rounded-xl border border-border p-4 min-h-[72px] flex items-center justify-center">
-            <p className="text-[11px] font-mono text-muted-foreground leading-relaxed text-center">
-              {loadingStep}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 pt-2">
-            <Cpu className="w-4 h-4 text-primary animate-spin" />
-            <span className="text-[9px] lcd-text text-muted-foreground">
-              BestSpot is working
-            </span>
-          </div>
+      <div className="app-loading-shell">
+        <Card className="w-full max-w-md border-border bg-card p-7 text-center shadow-sm">
+          <AlertTriangle className="mx-auto h-8 w-8 text-primary" />
+          <h2 className="mt-4 text-2xl font-semibold">We could not load your market data.</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Check the connection and try once more. Your saved scenarios are not affected.</p>
+          <Button className="mt-6 rounded-full" onClick={() => window.location.reload()}>Try again</Button>
         </Card>
       </div>
     );
   }
 
-  // --- RENDERING LANDING SCREEN (Scenario Selection) ---
-  if (!isScenarioSelected) {
+  if (isAnalyzing) {
     return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col font-sans p-4 md:p-8 relative overflow-hidden">
-        <div className="scanline" />
-        
-        {/* Floating background blobs */}
-        <div className="absolute top-10 left-10 w-72 h-72 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
-
-        <header className="flex items-center justify-between pb-6 mb-8 border-b border-border">
-          <div className="flex items-center gap-2.5">
-            <span className="brand-pin text-3xl" aria-hidden />
-            <div>
-              <h1 className="text-2xl font-display font-semibold text-foreground leading-none">BestSpot</h1>
-              <p className="text-[11px] text-muted-foreground mt-1">Find your best spot for your next business</p>
-            </div>
+      <div className="analysis-loading-shell">
+        <div className="analysis-loading-card">
+          <div className="analysis-loading-map" aria-hidden>
+            <div className="analysis-road analysis-road-one" /><div className="analysis-road analysis-road-two" />
+            <div className="analysis-radius" /><span className="brand-pin pin-drop text-5xl" />
           </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="border-border text-muted-foreground text-[10px]">
-              Ontario
-            </Badge>
-            <AccountButton />
+          <div className="analysis-loading-copy">
+            <p className="eyebrow">Building your decision view</p>
+            <h2>Checking {municipalityName} for your {businessSubcategory.toLowerCase()}.</h2>
+            <p>{loadingStep}</p>
+            <div className="analysis-progress"><span style={{ width: `${loadingProgress}%` }} /></div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground"><span>Map · competition · demand · costs</span><strong>{loadingProgress}%</strong></div>
           </div>
-        </header>
-
-        <main className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-12 max-w-6xl mx-auto w-full z-10 py-6">
-          <div className="flex-1 max-w-lg space-y-6 text-center lg:text-left">
-            <Badge className="bg-secondary text-foreground/80 hover:bg-secondary border border-border uppercase tracking-widest text-[10px] py-1 px-3">
-              First shop or fifth — same 60 seconds
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-display font-semibold text-foreground leading-[1.08] tracking-tight">
-              Will your business
-              <br />
-              work <span className="italic text-primary">there</span>?
-            </h2>
-            <p className="text-muted-foreground text-sm md:text-base leading-relaxed">
-              Pick a spot. Name your idea. BestSpot shows the competition on a real map, what
-              it costs to run, and a straight answer —{" "}
-              <span className="text-foreground font-medium">before you sign a lease</span>.
-            </p>
-
-            <div className="grid grid-cols-2 gap-4 text-left pt-2">
-              <div className="border border-border bg-card p-4 rounded-xl">
-                <MapPin className="w-5 h-5 text-primary mb-2" />
-                <h4 className="text-sm font-display text-foreground">Who's already there?</h4>
-                <p className="text-[11px] text-muted-foreground mt-1 leading-snug">Every competitor near your spot, pinned on a real map.</p>
-              </div>
-              <div className="border border-border bg-card p-4 rounded-xl">
-                <Users className="w-5 h-5 text-accent mb-2" />
-                <h4 className="text-sm font-display text-foreground">Are your customers there?</h4>
-                <p className="text-[11px] text-muted-foreground mt-1 leading-snug">Real census data for the people who live around it.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full max-w-md">
-            <Card className="scada-panel border-border rounded-2xl shadow-2xl p-6 space-y-6">
-              <div className="border-b border-border pb-4 text-center">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="brand-pin text-2xl" aria-hidden />
-                  <h3 className="text-xl font-display font-semibold text-foreground">Check a spot</h3>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1.5">Three answers. About a minute.</p>
-              </div>
-
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> Where? — city or town
-                  </label>
-                  <SearchableSelect
-                    value={municipalityName}
-                    onValueChange={setMunicipalityName}
-                    options={municipalityOptions.map((city) => ({
-                      value: city.municipality_name,
-                      label: city.label,
-                    }))}
-                    placeholder="Select municipality"
-                    searchPlaceholder="Search or type any Ontario city..."
-                    allowCustomValue
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> Exact address <span className="opacity-60">(optional)</span>
-                  </label>
-                  <Input
-                    value={siteAddress}
-                    onChange={(event) => setSiteAddress(event.target.value)}
-                    placeholder="e.g. 100 King St W — anchors the radius here"
-                    className="bg-background/50 border-border font-mono text-sm h-11 rounded-xl focus-visible:ring-primary"
-                  />
-                  <p className="text-[10px] text-muted-foreground/70">
-                    Leave blank to analyse from the city centre. Add an address to centre the radius on a specific storefront.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                    <Store className="w-3.5 h-3.5" /> What? — a business type, or your own idea
-                  </label>
-                  <SearchableSelect
-                    value={businessInputMode === "custom" ? customBusinessQuery : businessSubcategory}
-                    onValueChange={handleBusinessChange}
-                    options={businessOptions.map((business) => ({
-                      value: business.business_subcategory,
-                      label: business.label,
-                    }))}
-                    placeholder="Select or type a business idea"
-                    searchPlaceholder="Search types, or type any idea (e.g. Tim Hortons)…"
-                    allowCustomValue
-                  />
-                  {businessInputMode === "custom" && businessResolution?.score_basis_note ? (
-                    <p className="text-[10px] text-primary/80">{businessResolution.score_basis_note}</p>
-                  ) : null}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs lcd-text text-muted-foreground flex items-center gap-1.5">
-                      <Target className="w-3.5 h-3.5" /> How far will customers come from?
-                    </label>
-                    <span className="text-primary font-mono text-sm font-bold">
-                      {radius[0]} km
-                    </span>
-                  </div>
-                  <Slider
-                    value={radius}
-                    onValueChange={setRadius}
-                    max={25}
-                    min={1}
-                    step={1}
-                    className="py-2 [&_[role=slider]]:bg-primary [&_[role=slider]]:border-primary"
-                  />
-                </div>
-
-                <Button
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-mono uppercase tracking-widest text-sm py-6 rounded-xl shadow-lg shadow-primary/20 transition-all duration-300 font-bold mt-4"
-                  onClick={handleStartAnalysis}
-                  disabled={isUpdating}
-                >
-                  <ChevronRight className="w-5 h-5 mr-2" />
-                  Show me my spot
-                </Button>
-              </div>
-            </Card>
-          </div>
-        </main>
-
-        <footer className="py-6 border-t border-border text-center text-[10px] lcd-text text-muted-foreground">
-          BestSpot — find your best spot for your next business
-        </footer>
+        </div>
       </div>
     );
   }
 
-  // --- RENDERING WORKSPACE SCREEN (Redesigned Tabbed Layout) ---
-  return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans p-4 lg:p-6 overflow-x-hidden relative">
-      <div className="scanline" />
+  if (!isScenarioSelected) {
+    return (
+      <div className="scenario-page">
+        <header className="app-topbar">
+          <div className="app-brand"><span className="brand-pin text-3xl" aria-hidden /><div><h1>BestSpot<span>.biz</span></h1><p>Location intelligence for your next business</p></div></div>
+          <div className="flex items-center gap-3"><span className="region-badge">Ontario</span><AccountButton /></div>
+        </header>
 
-      {/* Styled Top Syncing Progress Bar */}
-      <style>{`
-        @keyframes gradientSlide {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 200% 50%; }
-        }
-      `}</style>
-      <AnimatePresence>
-        {isUpdating && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed top-0 left-0 right-0 h-1.5 bg-primary z-50 shadow-md shadow-primary/30"
-            style={{
-              backgroundSize: "200% 100%",
-              animation: "gradientSlide 1.5s linear infinite"
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Header Panel */}
-      <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 pb-4 border-b border-border gap-4">
-        <div className="flex items-center gap-2.5">
-          <span className="brand-pin text-3xl" aria-hidden />
-          <div>
-            <h1 className="text-2xl font-display font-semibold text-foreground leading-none">BestSpot</h1>
-            <div className="flex items-center gap-2 mt-1.5">
-              <Badge variant="outline" className="border-primary/25 text-primary text-[10px] py-0.5 px-2 bg-primary/5">
-                {municipalityName} · {businessSubcategory} · {radius[0]} km
-              </Badge>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 text-[10px] text-muted-foreground hover:text-foreground px-1 underline"
-                onClick={() => setIsScenarioSelected(false)}
-              >
-                Change spot
-              </Button>
+        <main className="scenario-main">
+          <section className="scenario-intro">
+            <p className="eyebrow">Start with the question that matters</p>
+            <h2>Will your business work <em>there?</em></h2>
+            <p className="scenario-lead">Choose the idea and location. We will show what surrounds it, what it may cost, and whether another spot looks stronger.</p>
+            <div className="scenario-preview">
+              <div className="scenario-preview-map">
+                <div className="preview-street street-one" /><div className="preview-street street-two" /><div className="preview-street street-three" />
+                <div className="preview-radius" /><span className="brand-pin text-4xl" aria-hidden />
+                <i className="preview-dot dot-one" /><i className="preview-dot dot-two" /><i className="preview-dot dot-three" />
+              </div>
+              <div className="scenario-preview-copy">
+                <span className="preview-number">82</span>
+                <div><strong>A clear answer, not a data dump.</strong><p>Map first. Competition beside it. Costs and comparisons when you need them.</p></div>
+              </div>
             </div>
-          </div>
-        </div>
+            <div className="scenario-promises">
+              <span><MapPin /> Exact address or city centre</span><span><Users /> Real local market context</span><span><GitCompare /> Compare every promising spot</span>
+            </div>
+          </section>
 
-        {/* Sync/Status Indicators */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-md border border-border backdrop-blur-md">
-            <Signal
-              className={`w-3.5 h-3.5 ${isUpdating ? "text-accent animate-pulse" : "text-emerald-600"}`}
-            />
-            <span className="text-[10px] lcd-text text-foreground">
-              {isUpdating ? "ENGINE SYNCING..." : `SYNCED: ${lastUpdate.toLocaleTimeString()}`}
-            </span>
-          </div>
-          <Button
-            variant="outline"
-            className="bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary text-xs uppercase tracking-wider"
-            onClick={handleExport}
-            disabled={isExporting}
-          >
-            <Download
-              className={`w-3.5 h-3.5 mr-2 ${isExporting ? "animate-pulse" : ""}`}
-            />
-            {isExporting ? "Exporting..." : "Export Report"}
-          </Button>
+          <Card className="scenario-form-card">
+            <CardHeader className="scenario-form-header"><p className="eyebrow">New location check</p><CardTitle>Tell us about the spot</CardTitle><p>Four quick choices. About a minute.</p></CardHeader>
+            <CardContent className="space-y-5 p-6">
+              <div className="form-field"><label><Navigation /> City or town</label><SearchableSelect value={municipalityName} onValueChange={setMunicipalityName} options={municipalityOptions.map((city) => ({ value: city.municipality_name, label: city.label }))} placeholder="Choose a municipality" searchPlaceholder="Search any Ontario city…" allowCustomValue /></div>
+              <div className="form-field"><label><MapPin /> Exact storefront <small>optional</small></label><Input value={siteAddress} onChange={(event) => setSiteAddress(event.target.value)} placeholder="100 King St W" /><p>Leave blank to start from the city centre.</p></div>
+              <div className="form-field"><label><Store /> Business idea</label><SearchableSelect value={businessInputMode === "custom" ? customBusinessQuery : businessSubcategory} onValueChange={handleBusinessChange} options={businessOptions.map((business) => ({ value: business.business_subcategory, label: business.label }))} placeholder="Choose or type an idea" searchPlaceholder="Try bakery, gym, dental clinic…" allowCustomValue />{businessInputMode === "custom" && businessResolution?.score_basis_note ? <p className="text-primary">{businessResolution.score_basis_note}</p> : null}</div>
+              <div className="form-field"><div className="flex items-center justify-between"><label><Target /> Customer reach</label><strong className="radius-value">{radius[0]} km</strong></div><Slider value={radius} onValueChange={setRadius} min={1} max={25} step={1} className="py-2" /><div className="range-labels"><span>Neighbourhood</span><span>Regional</span></div></div>
+              <Button className="scenario-submit" onClick={handleStartAnalysis} disabled={isUpdating}>Show me this spot<ChevronRight /></Button>
+              <p className="form-assurance"><ShieldCheck /> Your searches stay inside your account.</p>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  const feasibilityScore = ml?.predicted_feasibility_score ?? 0;
+  const recommendationLabel = recommendationDecision?.recommendation_label || readableRecommendation(ml?.recommendation);
+  const competitorCount = competitionEvidence?.observed_competitor_count ?? geoContext?.real_competitor_count ?? 0;
+  const demandScore = demandEvidence?.demand_pressure_index ?? breakdown?.demand_analysis?.score ?? 0;
+  const competitionScore = competitionEvidence?.competition_pressure_index ?? breakdown?.competition_analysis?.score ?? 0;
+  const costScore = leaseCostEvidence?.rent_pressure_index ?? breakdown?.lease_cost_analysis?.score ?? 0;
+
+  const tabs = [
+    { id: "map", label: "Map & competition", icon: MapPin },
+    { id: "overview", label: "Verdict", icon: Gauge },
+    { id: "benchmarks", label: "Costs & market", icon: DollarSign },
+    { id: "history", label: "Compare spots", icon: GitCompare },
+    { id: "evidence", label: "Data & setup", icon: ShieldCheck },
+  ] as const;
+
+  return (
+    <div className="workspace-page">
+      {isUpdating && <div className="workspace-sync-bar" />}
+      <header className="workspace-header">
+        <div className="app-brand"><span className="brand-pin text-3xl" aria-hidden /><div><h1>BestSpot<span>.biz</span></h1><p>Find the strongest place for your next move</p></div></div>
+        <div className="workspace-actions">
+          <span className="sync-status"><Signal className={isUpdating ? "animate-pulse" : ""} />{isUpdating ? "Updating your result" : `Updated ${lastUpdate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}</span>
+          <Button variant="outline" className="rounded-full" onClick={handleExport} disabled={isExporting}><Download />{isExporting ? "Preparing…" : "Export"}</Button>
           <AccountButton />
         </div>
       </header>
 
-      {/* Main Workspace Area */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Left Sidebar (Control Center) */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
-          
-          {/* Quick Dials */}
-          <Card className="scada-panel border-border">
-            <CardHeader className="pb-3 border-b border-border">
-              <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground flex justify-between items-center">
-                <span>Active Target</span>
-                <Badge variant="outline" className="border-border text-[9px] font-mono">{radius[0]} km</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div>
-                <p className="text-[10px] lcd-text text-muted-foreground">Location</p>
-                <p className="font-mono text-sm text-foreground mt-0.5">{municipalityName}</p>
-              </div>
-              <div>
-                <p className="text-[10px] lcd-text text-muted-foreground">Business Subcategory</p>
-                <p className="font-mono text-sm text-foreground mt-0.5">{businessSubcategory}</p>
-              </div>
-              <div className="pt-2">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[10px] lcd-text text-muted-foreground">Adjust Radius</label>
-                  <span className="text-primary font-mono text-xs font-bold">{radius[0]} km</span>
-                </div>
-                <Slider
-                  value={radius}
-                  onValueChange={setRadius}
-                  max={25}
-                  min={1}
-                  step={1}
-                  className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-primary"
-                />
-              </div>
-            </CardContent>
-          </Card>
+      <main className="workspace-shell">
+        <section className="scenario-ribbon">
+          <div className="scenario-ribbon-main"><span className="scenario-ribbon-pin"><MapPin /></span><div><p>Active location</p><h2>{businessInputMode === "custom" && customBusinessQuery ? customBusinessQuery : businessSubcategory} in {municipalityName}</h2><span>{siteAddress.trim() || "City-centre search"} · {radius[0]} km customer reach</span></div></div>
+          <div className="scenario-ribbon-controls"><div className="mini-radius"><span>Reach</span><Slider value={radius} onValueChange={setRadius} min={1} max={25} step={1} /><strong>{radius[0]} km</strong></div><Button variant="ghost" className="rounded-full" onClick={() => setIsScenarioSelected(false)}>Change search</Button></div>
+        </section>
 
-          {/* Dynamic Business Resolver Panel */}
-          <BusinessResolverPanel
-            municipalityName={municipalityName}
-            radiusKm={radius[0]}
-            currentCatalogBusinessSubcategory={businessSubcategory}
-            businessInputMode={businessInputMode}
-            onBusinessInputModeChange={setBusinessInputMode}
-            customBusinessQuery={customBusinessQuery}
-            onCustomBusinessQueryChange={setCustomBusinessQuery}
-            useCustomBusinessForMap={useCustomBusinessForMap}
-            onUseCustomBusinessForMapChange={setUseCustomBusinessForMap}
-            onBusinessResolutionChange={setBusinessResolution}
-            className="scada-panel border-border shadow-md"
-          />
+        <nav className="workspace-tabs" aria-label="Analysis sections">
+          {tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={activeTab === id ? "active" : ""} onClick={() => setActiveTab(id)}><Icon />{label}{id === "history" && scenarioHistory.length > 0 ? <span>{scenarioHistory.length}</span> : null}</button>)}
+        </nav>
 
-          {/* Validation Panel */}
-          <Card className="scada-panel border-border">
-            <CardHeader className="pb-3 border-b border-border">
-              <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  System Diagnostics
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full bg-emerald-400/10 hover:bg-emerald-400/20 border-emerald-400/30 text-emerald-700 font-mono text-xs uppercase"
-                onClick={handleRunValidation}
-                disabled={isValidating}
-              >
-                {isValidating ? "Validating..." : "Run System Validation"}
-              </Button>
-              {systemValidation && (
-                <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
-                  {systemValidation.checks.map((check) => (
-                    <p
-                      key={check.name}
-                      className={`text-[10px] font-mono ${check.status === "passed" ? "text-emerald-700" : "text-destructive"}`}
-                    >
-                      {check.status === "passed" ? "PASS" : "FAIL"}: {check.name}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <AnimatePresence mode="wait">
+          <motion.section key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }} className="workspace-content">
+            {activeTab === "map" && (
+              <div className="space-y-5">
+                <section className="decision-strip">
+                  <div className="decision-score"><strong>{feasibilityScore.toFixed(0)}</strong><span>/100</span></div>
+                  <div className="decision-copy"><p className="eyebrow">Your first read</p><h2>{recommendationLabel}</h2><p>{recommendationDecision?.decision_summary || explanation?.feasibility_explanation || "Your feasibility result is ready. Explore the map and evidence below."}</p></div>
+                  <div className="decision-actions"><Button variant="outline" className="rounded-full" onClick={handleSaveScenario} disabled={isSavingScenario}><Save />{isSavingScenario ? "Saving…" : "Save spot"}</Button><Button className="rounded-full" onClick={() => setActiveTab("history")}><GitCompare />Compare</Button></div>
+                </section>
 
-          {/* ML Model Status */}
-          <Card className="scada-panel border-border">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <BrainCircuit
-                  className={`w-4 h-4 ${modelStatus?.status === "ready" ? "text-primary" : "text-accent"}`}
-                />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                    Model Status
-                  </p>
-                  <p className="text-xs font-mono text-foreground uppercase">
-                    {modelStatus?.status ?? "unknown"}
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div className="rounded border border-border bg-white/[0.03] p-1.5 text-center">
-                  <p className="text-muted-foreground">Rows</p>
-                  <p className="font-mono text-foreground mt-0.5">{modelStatus ? formatNumber(modelStatus.row_count) : "N/A"}</p>
-                </div>
-                <div className="rounded border border-border bg-white/[0.03] p-1.5 text-center">
-                  <p className="text-muted-foreground">Accuracy</p>
-                  <p className="font-mono text-primary mt-0.5">{formatPercent(modelStatus?.risk_accuracy)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Workspace (Tabbed Content View) */}
-        <div className="lg:col-span-9 flex flex-col gap-6">
-          
-          {/* Navigation Tabs */}
-          <nav className="flex items-center gap-1 bg-card p-1.5 rounded-xl border border-border overflow-x-auto scrollbar-hide">
-            {[
-              { id: "map", label: "Your Spot", icon: MapPin },
-              { id: "overview", label: "The Verdict", icon: BarChart4 },
-              { id: "evidence", label: "The Evidence", icon: Database },
-              { id: "benchmarks", label: "Running Costs", icon: DollarSign },
-              { id: "history", label: "Find a Better Spot", icon: GitCompare },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-200 shrink-0 ${
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 font-bold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Active Tab Panel Render */}
-          <div className="min-h-[500px]">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
-                
-                {/* 1. OVERVIEW TAB */}
-                {activeTab === "overview" && (
-                  <>
-                    {/* Recommendation Decision Card */}
-                    {recommendationDecision && (
-                      <Card className="scada-panel border-border bg-primary/[0.02]">
-                        <CardContent className="p-6 space-y-4">
-                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-3">
-                            <div>
-                              <p className="text-[10px] text-primary uppercase tracking-widest font-mono">
-                                Unified Feasibility Recommendation
-                              </p>
-                              <h3 className="text-xl font-bold text-foreground mt-1">
-                                {recommendationDecision.decision_summary}
-                              </h3>
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className={`text-sm py-1 px-3 rounded-full font-mono uppercase ${recommendationBadgeClass(recommendationDecision.final_recommendation)}`}
-                            >
-                              {recommendationDecision.recommendation_label}
-                            </Badge>
-                          </div>
-                          
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {recommendationDecision.action_guidance}
-                          </p>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                            <div className="space-y-2">
-                              <p className="text-xs font-mono text-emerald-600 uppercase tracking-wider">
-                                Primary Strengths
-                              </p>
-                              <ul className="space-y-1.5">
-                                {recommendationDecision.major_strengths.map((item) => (
-                                  <li key={item} className="text-xs text-muted-foreground flex items-start gap-2">
-                                    <span className="text-emerald-600 font-bold">•</span>
-                                    <span>{item}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-xs font-mono text-destructive uppercase tracking-wider">
-                                Risk Factors / Concerns
-                              </p>
-                              <ul className="space-y-1.5">
-                                {recommendationDecision.major_concerns.map((item) => (
-                                  <li key={item} className="text-xs text-muted-foreground flex items-start gap-2">
-                                    <span className="text-destructive font-bold">•</span>
-                                    <span>{item}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* KPI Cards Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <Card className="scada-panel">
-                        <CardContent className="p-5">
-                          <p className="text-[10px] lcd-text text-muted-foreground">Total Population</p>
-                          <p className="text-3xl data-value mt-1">{formatNumber(populationValue)}</p>
-                          <p className="text-[10px] text-muted-foreground mt-2 font-mono">{municipalityName}</p>
-                        </CardContent>
-                      </Card>
-                      <Card className="scada-panel">
-                        <CardContent className="p-5">
-                          <p className="text-[10px] lcd-text text-muted-foreground">Feasibility Score</p>
-                          <p className="text-3xl data-value-accent mt-1">
-                            {ml?.predicted_feasibility_score?.toFixed(1) ?? "N/A"}/100
-                          </p>
-                          <p className="text-[10px] text-muted-foreground mt-2 font-mono">Simulated Score</p>
-                        </CardContent>
-                      </Card>
-                      <Card className="scada-panel">
-                        <CardContent className="p-5">
-                          <p className="text-[10px] lcd-text text-muted-foreground">Revenue Estimate</p>
-                          <p className={`text-2xl font-mono mt-1.5 font-bold ${indicatorTextClass(dashboardData.revenue_monitor.indicator)}`}>
-                            {formatCurrency(ml?.predicted_monthly_net_revenue)}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground mt-2 font-mono">Net Profit/Month</p>
-                        </CardContent>
-                      </Card>
-                      <Card className="scada-panel">
-                        <CardContent className="p-5">
-                          <p className="text-[10px] lcd-text text-muted-foreground">Risk Forecast</p>
-                          <p className={`text-3xl font-mono mt-1 font-bold ${indicatorTextClass(dashboardData.risk_monitor.indicator)}`}>
-                            {ml?.predicted_risk_class?.toUpperCase() ?? "N/A"}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground mt-2 font-mono">ML Risk Index</p>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Chart visualizations */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
-                      <Card className="scada-panel flex flex-col h-full">
-                        <CardHeader className="pb-0 pt-4 px-5">
-                          <CardTitle className="text-xs lcd-text text-foreground">Population Coverage Area</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-1 p-0 px-2 pb-2 mt-2">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={populationTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <defs>
-                                <linearGradient id="colorPop" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                              <XAxis dataKey="time" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
-                              <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${Math.round(Number(val) / 1000)}k`} />
-                              <RechartsTooltip contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.9)", borderColor: "rgba(6, 182, 212, 0.3)", borderRadius: "4px" }} itemStyle={{ color: "#06b6d4" }} formatter={(value: number) => [`${value.toLocaleString()} people`, "Population"]} />
-                              <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#colorPop)" />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="scada-panel flex flex-col h-full">
-                        <CardHeader className="pb-0 pt-4 px-5">
-                          <CardTitle className="text-xs lcd-text text-foreground">Demographic Segment Distribution</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-1 p-0 px-2 pb-4 mt-2">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={demographicChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                              <XAxis dataKey="group" stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} />
-                              <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
-                              <RechartsTooltip contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.9)", borderColor: "rgba(255,255,255,0.1)", borderRadius: "4px" }} cursor={{ fill: "rgba(255,255,255,0.05)" }} formatter={(value: number) => [`${value}%`, "Value"]} />
-                              <Bar dataKey="value" radius={[2, 2, 0, 0]}>
-                                {demographicChartData.map((_, index) => (
-                                  <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "hsl(var(--primary))" : "hsl(var(--accent))"} fillOpacity={0.8} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Explanations & Driver breakdown */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <Card className="scada-panel md:col-span-2">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground">Prediction Explanation Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4 text-xs text-muted-foreground leading-relaxed">
-                          <p>{explanation?.revenue_explanation}</p>
-                          <p>{explanation?.risk_explanation}</p>
-                          <p>{explanation?.feasibility_explanation}</p>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="scada-panel">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground">Main Drivers</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div>
-                            <p className="text-[9px] text-emerald-600 font-mono uppercase tracking-widest mb-1.5">Positive Factors</p>
-                            <div className="space-y-1">
-                              {(explanation?.top_positive_factors ?? []).map((factor) => (
-                                <p key={factor} className="text-xs text-muted-foreground border-l border-emerald-400/30 pl-2">{factor}</p>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-destructive font-mono uppercase tracking-widest mb-1.5">Negative Factors</p>
-                            <div className="space-y-1">
-                              {(explanation?.top_negative_factors ?? []).map((factor) => (
-                                <p key={factor} className="text-xs text-muted-foreground border-l border-destructive/30 pl-2">{factor}</p>
-                              ))}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </>
-                )}
-
-                {/* 2. GEOSPATIAL MAP TAB */}
-                {activeTab === "map" && (
-                  <>
-                    {geoContext ? (
-                      <div className="mb-3 space-y-2">
-                        {/* Honest reference-point banner: address anchor vs city centre */}
-                        <div
-                          className={`rounded-xl border px-4 py-2.5 text-xs font-mono flex items-start gap-2 ${
-                            geoContext.anchor_type === "address"
-                              ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-700"
-                              : "border-amber-500/25 bg-amber-500/5 text-amber-700"
-                          }`}
-                        >
-                          <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                          <span>
-                            {geoContext.anchor_note ||
-                              (geoContext.anchor_type === "address"
-                                ? `Centred on ${geoContext.resolved_address}`
-                                : `Centred on ${geoContext.municipality_name} city centre.`)}
-                            {geoContext.municipality_match === false
-                              ? " ⚠ This address may be outside the selected municipality — confirm before trusting the numbers."
-                              : ""}
-                          </span>
-                        </div>
-                        {/* Honest feasibility-score basis banner */}
-                        {geoContext.score_basis &&
-                        geoContext.score_basis !== "exact_catalog" &&
-                        geoContext.score_basis_note ? (
-                          <div
-                            className={`rounded-xl border px-4 py-2.5 text-xs font-mono flex items-start gap-2 ${
-                              geoContext.score_basis === "unavailable"
-                                ? "border-rose-500/25 bg-rose-500/5 text-rose-700"
-                                : "border-sky-500/25 bg-sky-500/5 text-sky-200"
-                            }`}
-                          >
-                            <Store className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                            <span>{geoContext.score_basis_note}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    <MarketMapPanel
-                      geoContext={geoContext}
-                      isLoading={isGeoLoading}
-                      error={geoError}
-                      onRetry={() => loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest)}
-                    />
-                    
-                    <div className="grid grid-cols-1 gap-6">
-                      {/* Spatial Support Level */}
-                      <ScenarioSupportPanel
-                        municipalityName={municipalityName}
-                        businessSubcategory={businessSubcategory}
-                        radiusKm={radius[0]}
-                        businessInputMode={businessInputMode}
-                        customBusinessQuery={customBusinessQuery}
-                        useCustomBusinessForMap={useCustomBusinessForMap}
-                        businessResolution={businessResolution}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* 3. EVIDENCE INDICATORS TAB */}
-                {activeTab === "evidence" && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Demand Card */}
-                    <Card className="scada-panel border-border">
-                      <CardContent className="p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-border pb-2">
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-emerald-600" />
-                            <div>
-                              <p className="text-[10px] text-muted-foreground uppercase font-mono">Demand Evidence</p>
-                              <p className="text-xs font-mono text-foreground">{demandEvidence ? demandEvidence.credibility : "Fallback Proxy"}</p>
-                            </div>
-                          </div>
-                          <Badge variant="outline" className="text-emerald-600 border-emerald-400/30 uppercase font-mono text-[10px]">
-                            {demandEvidence ? demandEvidence.demand_level : "Proxy"}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">DEMAND INDEX</p>
-                            <p className="text-sm text-emerald-600 mt-0.5">{demandEvidence?.demand_pressure_index?.toFixed(1) ?? "N/A"}</p>
-                          </div>
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">CUSTOMER POOL</p>
-                            <p className="text-sm text-foreground mt-0.5">{demandEvidence ? formatNumber(demandEvidence.target_customer_pool_estimate) : "N/A"}</p>
-                          </div>
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">FOOT TRAFFIC</p>
-                            <p className="text-sm text-foreground mt-0.5">{demandEvidence?.foot_traffic_proxy_index?.toFixed(1) ?? "N/A"}</p>
-                          </div>
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">TRANSIT INDEX</p>
-                            <p className="text-sm text-foreground mt-0.5">{demandEvidence?.transit_access_proxy_index?.toFixed(1) ?? "N/A"}</p>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-3">
-                          {demandEvidence ? demandEvidence.data_quality_note : "No catalog row exists for this selected scenario. Using explicit fallback proxy index."}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* Competition Card */}
-                    <Card className="scada-panel border-border">
-                      <CardContent className="p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-border pb-2">
-                          <div className="flex items-center gap-2">
-                            <Database className="w-5 h-5 text-primary" />
-                            <div>
-                              <p className="text-[10px] text-muted-foreground uppercase font-mono">Competition Evidence</p>
-                              <p className="text-xs font-mono text-foreground">
-                                {competitionIsLiveOsm
-                                  ? (competitionEvidence?.source_name ?? "OpenStreetMap")
-                                  : competitionEvidence
-                                    ? competitionEvidence.credibility
-                                    : "Fallback Proxy"}
-                              </p>
-                            </div>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className={
-                              competitionIsLiveOsm
-                                ? "text-emerald-700 border-emerald-400/40 uppercase font-mono text-[10px]"
-                                : "text-primary border-primary/30 uppercase font-mono text-[10px]"
-                            }
-                          >
-                            {competitionIsLiveOsm ? "Live OSM" : competitionEvidence ? "Catalog" : "Proxy"}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">COMPETITORS</p>
-                            <p className="text-sm text-foreground mt-0.5">{competitionEvidence?.observed_competitor_count ?? "N/A"}</p>
-                          </div>
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">DENSITY / 10K</p>
-                            <p className="text-sm text-foreground mt-0.5">{competitionEvidence?.competitor_density_per_10k?.toFixed(2) ?? "N/A"}</p>
-                          </div>
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">NEAREST POI</p>
-                            <p className="text-sm text-foreground mt-0.5">
-                              {competitionEvidence?.nearest_competitor_distance_km != null ? `${competitionEvidence.nearest_competitor_distance_km.toFixed(1)} km` : "N/A"}
-                            </p>
-                          </div>
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">COMP. PRESSURE</p>
-                            <p className="text-sm text-primary mt-0.5">{competitionEvidence?.competition_pressure_index?.toFixed(1) ?? "N/A"}</p>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-3">
-                          {competitionEvidence ? competitionEvidence.source_method : "No catalog row exists for this selected scenario. Using explicit fallback proxy distance."}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* Lease Cost Card */}
-                    <Card className="scada-panel border-border">
-                      <CardContent className="p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-border pb-2">
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="w-5 h-5 text-accent" />
-                            <div>
-                              <p className="text-[10px] text-muted-foreground uppercase font-mono">Lease Cost Evidence</p>
-                              <p className="text-xs font-mono text-foreground">{leaseCostEvidence ? leaseCostEvidence.credibility : "Fallback Proxy"}</p>
-                            </div>
-                          </div>
-                          <Badge variant="outline" className="text-accent border-accent/30 uppercase font-mono text-[10px]">
-                            {leaseCostEvidence ? leaseCostEvidence.commercial_cost_pressure_level : "Proxy"}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">MEDIAN LEASE</p>
-                            <p className="text-sm text-foreground mt-0.5">{formatCurrency(leaseCostEvidence?.median_monthly_lease_cost)}</p>
-                          </div>
-                          <div className="border border-border bg-white/[0.02] p-2 rounded">
-                            <p className="text-[9px] text-muted-foreground">COST / SQFT / YR</p>
-                            <p className="text-sm text-foreground mt-0.5">
-                              {leaseCostEvidence?.lease_cost_per_sqft_year != null ? `$${leaseCostEvidence.lease_cost_per_sqft_year.toFixed(2)}` : "N/A"}
-                            </p>
-                          </div>
-                          <div className="border border-border bg-white/[0.02] p-2 rounded col-span-2">
-                            <p className="text-[9px] text-muted-foreground">MONTHLY ESTIMATE RANGE</p>
-                            <p className="text-xs text-foreground mt-0.5">
-                              {leaseCostEvidence ? `${formatCurrency(leaseCostEvidence.low_monthly_lease_cost)} - ${formatCurrency(leaseCostEvidence.high_monthly_lease_cost)}` : "N/A"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-3">
-                          {leaseCostEvidence ? leaseCostEvidence.data_quality_note : "No lease evidence row exists for this selected scenario. Using explicit fallback range."}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* Data Credibility Audits */}
-                    <Card className="scada-panel border-border md:col-span-3">
-                      <CardHeader className="pb-2">
-                        <div className="flex justify-between items-center">
-                          <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground">Prediction Credibility Audit</CardTitle>
-                          <Badge variant="outline" className={credibilityClass(credibility?.confidence_level)}>
-                            {credibility?.confidence_level?.toUpperCase()} CONFIDENCE · {credibility?.overall_confidence_score?.toFixed(1)}/100
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4 text-xs">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <p className="text-[10px] text-emerald-600 font-mono uppercase tracking-widest">Observed Real Data</p>
-                            <div className="space-y-1">
-                              {(credibility?.observed_inputs ?? []).slice(0, 3).map((item) => (
-                                <p key={item.field_name} className="p-2 border border-border bg-white/[0.01] rounded">
-                                  <strong className="text-foreground font-mono">{item.label}:</strong> {item.user_note}
-                                </p>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] text-accent font-mono uppercase tracking-widest">Estimated Proxy Data</p>
-                            <div className="space-y-1">
-                              {(credibility?.proxy_estimated_inputs ?? []).slice(0, 3).map((item) => (
-                                <p key={item.field_name} className="p-2 border border-accent/10 bg-accent/[0.01] rounded">
-                                  <strong className="text-accent font-mono">{item.label}:</strong> {item.user_note}
-                                </p>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                <div className="map-workspace-grid">
+                  <div className="map-primary-column">
+                    <div className="map-section-heading"><div><p className="eyebrow">See what surrounds the spot</p><h2>Competition on the map</h2></div><span className="map-source-badge"><span />{competitionIsLiveOsm ? "Live market evidence" : "Market evidence"}</span></div>
+                    {geoContext ? <div className={`anchor-note ${geoContext.anchor_type === "address" ? "address" : "city"}`}><MapPin />{geoContext.anchor_note || (geoContext.anchor_type === "address" ? `Centred on ${geoContext.resolved_address}` : `Centred on ${geoContext.municipality_name} city centre.`)}</div> : null}
+                    <div className="map-frame"><MarketMapPanel geoContext={geoContext} isLoading={isGeoLoading} error={geoError} onRetry={() => loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest)} /></div>
                   </div>
-                )}
 
-                {/* 4. OPERATING BENCHMARKS TAB */}
-                {activeTab === "benchmarks" && (
-                  <div className="space-y-6">
-                    <OperatingProfilePanel
-                      municipalityName={municipalityName}
-                      radiusKm={radius[0]}
-                      businessSubcategory={businessSubcategory}
-                      businessQuery={customBusinessQuery}
-                      businessResolution={businessResolution as unknown as Record<string, unknown> | null}
-                      customBusinessMapActive={businessInputMode === "custom" && useCustomBusinessForMap}
-                      initialProfile={operatingProfile}
-                    />
-                  </div>
-                )}
-
-                {/* 5. HISTORY & COMPARISONS TAB */}
-                {activeTab === "history" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Left comparison control and history list */}
-                    <Card className="scada-panel border-border lg:col-span-4 h-full">
-                      <CardHeader className="pb-3 border-b border-border">
-                        <CardTitle className="text-xs font-display tracking-wider uppercase text-foreground">Scenario Controls</CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4 space-y-4">
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            variant="outline"
-                            className="bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary-foreground font-mono text-xs uppercase"
-                            onClick={handleSaveScenario}
-                            disabled={isSavingScenario}
-                          >
-                            <Save className={`w-3.5 h-3.5 mr-1.5 ${isSavingScenario ? "animate-pulse" : ""}`} />
-                            {isSavingScenario ? "Saving" : "Save Active"}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="bg-white/[0.03] hover:bg-white/[0.07] border-border text-foreground font-mono text-xs uppercase"
-                            onClick={handleCompareScenarios}
-                            disabled={isComparingScenarios || scenarioHistory.length < 1}
-                          >
-                            <GitCompare className={`w-3.5 h-3.5 mr-1.5 ${isComparingScenarios ? "animate-pulse" : ""}`} />
-                            Run Compare
-                          </Button>
-                        </div>
-
-                        {scenarioHistory.length > 0 && (
-                          <Button
-                            variant="ghost"
-                            className="w-full text-[10px] text-muted-foreground hover:text-foreground uppercase font-mono"
-                            onClick={handleClearHistory}
-                          >
-                            Clear Comparison History
-                          </Button>
-                        )}
-
-                        <div className="space-y-2 border-t border-border pt-4">
-                          <p className="text-[10px] text-muted-foreground uppercase font-mono">Saved Scenarios ({scenarioHistory.length})</p>
-                          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                            {scenarioHistory.map((item) => (
-                              <div key={item.scenario_id} className="rounded border border-border bg-white/[0.02] p-3 text-xs">
-                                <p className="font-mono text-foreground font-semibold">{item.business_subcategory}</p>
-                                <p className="text-[10px] text-muted-foreground mt-0.5">{item.municipality_name} • {item.radius_km} km</p>
-                                <p className="text-[10px] text-primary font-mono mt-1">
-                                  {formatCurrency(item.predicted_monthly_net_revenue)} • Score: {item.predicted_feasibility_score?.toFixed(1) ?? "N/A"}
-                                </p>
-                              </div>
-                            ))}
-                            {scenarioHistory.length === 0 && (
-                              <p className="text-[10px] text-muted-foreground italic">No saved scenarios yet. Click &apos;Save Active&apos; to add the current workspace parameters.</p>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Right comparison matrix view */}
-                    <div className="lg:col-span-8 space-y-6">
-                      <LocationComparisonPanel
-                        municipalityName={municipalityName}
-                        businessSubcategory={businessSubcategory}
-                        radiusKm={radius[0]}
-                        onApplyScenario={({ municipality_name, business_subcategory, radius_km }) => {
-                          setMunicipalityName(municipality_name);
-                          setBusinessSubcategory(business_subcategory);
-                          setRadius([radius_km]);
-                        }}
-                      />
-
-                      {scenarioComparison && (
-                        <Card className="scada-panel border-border bg-accent/[0.01]">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-display tracking-wider uppercase text-accent">Comparison Summary Insights</CardTitle>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                              {scenarioComparison.comparison_summary}
-                            </p>
-                            
-                            <div className="space-y-2 border-t border-border pt-3">
-                              <p className="text-[10px] text-muted-foreground uppercase font-mono">Rankings Matrix</p>
-                              {scenarioComparison.rankings.map((item, index) => (
-                                <div key={item.scenario_id} className="flex justify-between items-center p-2.5 rounded bg-white/[0.01] border border-border text-xs">
-                                  <span className="font-mono text-muted-foreground">
-                                    <strong className="text-foreground">#{index + 1}</strong> {item.label}
-                                  </span>
-                                  <span className="font-mono text-accent font-bold">{item.overall_score.toFixed(1)}/100</span>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-
-      {/* --- FLOATING AI CHATBOT SYSTEM --- */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
-        <AnimatePresence>
-          {isChatOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 30, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="w-[90vw] sm:w-[420px] shadow-2xl rounded-2xl overflow-hidden border border-border bg-card backdrop-blur-xl"
-            >
-              <div className="bg-primary/20 p-3 flex justify-between items-center border-b border-border">
-                <div className="flex items-center gap-2">
-                  <BrainCircuit className="w-5 h-5 text-primary" />
-                  <span className="font-display text-xs text-foreground font-bold tracking-wider">BestSpot Assistant</span>
+                  <aside className="map-insight-rail">
+                    <div className="insight-card insight-card-primary"><div className="insight-card-icon"><Store /></div><p>Nearby competition</p><strong>{formatNumber(competitorCount)}</strong><span>{competitionEvidence?.nearest_competitor_distance_km != null ? `Nearest is ${competitionEvidence.nearest_competitor_distance_km.toFixed(1)} km away` : "Inside your selected reach"}</span><div className="meter"><i style={{ width: `${Math.min(100, competitionScore)}%` }} /></div><small>{indicatorLabelForCompetition(dashboardData.competition_monitor.indicator)} pressure</small></div>
+                    <div className="insight-card"><div className="insight-card-icon green"><Users /></div><p>Reachable people</p><strong>{formatNumber(populationValue)}</strong><span>{demandEvidence?.target_customer_pool_estimate ? `${formatNumber(demandEvidence.target_customer_pool_estimate)} likely target customers` : "Local population in the data view"}</span><div className="meter green"><i style={{ width: `${Math.min(100, demandScore)}%` }} /></div><small>Demand score {demandScore.toFixed(0)}/100</small></div>
+                    <div className="insight-card"><div className="insight-card-icon ink"><DollarSign /></div><p>Monthly lease range</p><strong className="text-2xl">{leaseCostEvidence ? formatCurrency(leaseCostEvidence.median_monthly_lease_cost) : "N/A"}</strong><span>{leaseCostEvidence ? `${formatCurrency(leaseCostEvidence.low_monthly_lease_cost)} – ${formatCurrency(leaseCostEvidence.high_monthly_lease_cost)}` : "Open Costs & market for estimates"}</span><button type="button" onClick={() => setActiveTab("benchmarks")}>See cost picture <ChevronRight /></button></div>
+                  </aside>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsChatOpen(false)}
-                  className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
-              <div className="max-h-[500px] overflow-y-auto p-2">
-                <ScenarioAIChat
-                  municipalityName={municipalityName}
-                  businessSubcategory={businessSubcategory}
-                  radiusKm={radius[0]}
-                />
+            )}
+
+            {activeTab === "overview" && (
+              <div className="verdict-layout">
+                <section className="verdict-hero-card">
+                  <div className="verdict-ring"><strong>{feasibilityScore.toFixed(0)}</strong><span>out of 100</span></div>
+                  <div className="verdict-main"><p className="eyebrow">BestSpot verdict</p><h2>{recommendationLabel}</h2><p>{recommendationDecision?.decision_rationale || explanation?.feasibility_explanation}</p><div className="verdict-guidance"><Navigation /><span>{recommendationDecision?.action_guidance || "Use the evidence below to confirm the location before making a lease commitment."}</span></div></div>
+                </section>
+                <section className="metric-row">
+                  <article><DollarSign /><p>Predicted monthly net</p><strong>{formatCurrency(ml?.predicted_monthly_net_revenue)}</strong><span className={indicatorTextClass(dashboardData.revenue_monitor.indicator)}>{indicatorLabelForRevenue(dashboardData.revenue_monitor.indicator)} outlook</span></article>
+                  <article><AlertTriangle /><p>Business risk</p><strong>{ml?.predicted_risk_class?.replaceAll("_", " ") || "N/A"}</strong><span className={indicatorTextClass(dashboardData.risk_monitor.indicator)}>{indicatorLabelForRisk(dashboardData.risk_monitor.indicator)} risk</span></article>
+                  <article><ShieldCheck /><p>Decision confidence</p><strong>{recommendationDecision?.decision_confidence_score?.toFixed(0) ?? credibility?.overall_confidence_score?.toFixed(0) ?? "N/A"}<small>/100</small></strong><span>{credibility?.confidence_level || "Evidence based"} confidence</span></article>
+                </section>
+                <div className="verdict-detail-grid">
+                  <Card className="plain-card"><CardHeader><CardTitle>What helps this spot</CardTitle></CardHeader><CardContent className="factor-list positive">{(recommendationDecision?.major_strengths || explanation?.top_positive_factors || []).slice(0, 5).map((factor) => <p key={factor}><span><TrendingUp /></span>{factor}</p>)}</CardContent></Card>
+                  <Card className="plain-card"><CardHeader><CardTitle>What needs a closer look</CardTitle></CardHeader><CardContent className="factor-list caution">{(recommendationDecision?.major_concerns || explanation?.top_negative_factors || []).slice(0, 5).map((factor) => <p key={factor}><span><AlertTriangle /></span>{factor}</p>)}</CardContent></Card>
+                </div>
+                <Card className="plain-card market-profile"><CardHeader><div><p className="eyebrow">People around the spot</p><CardTitle>Local market profile</CardTitle></div></CardHeader><CardContent className="profile-grid"><div><span>Population</span><strong>{formatNumber(populationValue)}</strong></div><div><span>Median household income</span><strong>{formatCurrency(medianIncome)}</strong></div><div><span>Population density</span><strong>{formatNumber(density)}<small>/km²</small></strong></div><div><span>Students</span><strong>{studentPct.toFixed(1)}%</strong></div><div><span>Families</span><strong>{familiesPct.toFixed(1)}%</strong></div><div><span>Retirees</span><strong>{retireesPct.toFixed(1)}%</strong></div></CardContent></Card>
               </div>
-            </motion.div>
-          )}
+            )}
+
+            {activeTab === "benchmarks" && (
+              <div className="space-y-5">
+                <div className="content-heading"><div><p className="eyebrow">Money and market pressure</p><h2>Know the operating picture before the lease.</h2><p>These ranges turn local evidence into planning numbers. They are estimates, clearly separated from observed data.</p></div></div>
+                <section className="evidence-summary-grid">
+                  <article><div className="summary-icon"><TrendingUp /></div><p>Demand</p><strong>{demandScore.toFixed(0)}<small>/100</small></strong><span>{demandEvidence?.demand_level || breakdown?.demand_analysis?.level || "Market signal"}</span></article>
+                  <article><div className="summary-icon red"><Store /></div><p>Competition</p><strong>{competitionScore.toFixed(0)}<small>/100</small></strong><span>{competitorCount} observed nearby</span></article>
+                  <article><div className="summary-icon ink"><DollarSign /></div><p>Rent pressure</p><strong>{costScore.toFixed(0)}<small>/100</small></strong><span>{leaseCostEvidence?.commercial_cost_pressure_level || breakdown?.lease_cost_analysis?.level || "Estimated"}</span></article>
+                  <article><div className="summary-icon amber"><Activity /></div><p>Foot traffic</p><strong>{demandEvidence?.foot_traffic_proxy_index?.toFixed(0) ?? "N/A"}</strong><span>Public activity signal</span></article>
+                </section>
+                <OperatingProfilePanel municipalityName={municipalityName} radiusKm={radius[0]} businessSubcategory={businessSubcategory} businessQuery={customBusinessQuery} businessResolution={businessResolution as unknown as Record<string, unknown> | null} customBusinessMapActive={businessInputMode === "custom" && useCustomBusinessForMap} initialProfile={operatingProfile} />
+              </div>
+            )}
+
+            {activeTab === "history" && (
+              <div className="space-y-5">
+                <div className="content-heading compare-heading"><div><p className="eyebrow">Your strongest decision tool</p><h2>Compare every spot on equal terms.</h2><p>Save this result, explore another city or radius, then rank the options together.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" className="rounded-full" onClick={handleSaveScenario} disabled={isSavingScenario}><Save />{isSavingScenario ? "Saving…" : "Save current spot"}</Button><Button className="rounded-full" onClick={handleCompareScenarios} disabled={isComparingScenarios || scenarioHistory.length < 1}><GitCompare />{isComparingScenarios ? "Comparing…" : "Rank saved spots"}</Button></div></div>
+                <LocationComparisonPanel municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} onApplyScenario={({ municipality_name, business_subcategory, radius_km }) => { setMunicipalityName(municipality_name); setBusinessSubcategory(business_subcategory); setRadius([radius_km]); setActiveTab("map"); }} />
+                <div className="saved-spots-layout">
+                  <Card className="plain-card"><CardHeader className="flex-row items-center justify-between"><div><p className="eyebrow">Saved searches</p><CardTitle>{scenarioHistory.length} spot{scenarioHistory.length === 1 ? "" : "s"}</CardTitle></div>{scenarioHistory.length > 0 && <Button variant="ghost" size="sm" onClick={handleClearHistory}>Clear</Button>}</CardHeader><CardContent className="saved-list">{scenarioHistory.length === 0 ? <div className="empty-saved"><History /><strong>No saved spots yet</strong><p>Save this result, change the location, and you will have a comparison.</p></div> : scenarioHistory.map((item, index) => <article key={item.scenario_id}><span>{index + 1}</span><div><strong>{item.municipality_name}</strong><p>{item.business_subcategory} · {item.radius_km} km</p></div><div><strong>{item.predicted_feasibility_score?.toFixed(0) ?? "—"}</strong><small>/100</small></div></article>)}</CardContent></Card>
+                  {scenarioComparison ? <Card className="plain-card comparison-result"><CardHeader><p className="eyebrow">BestSpot ranking</p><CardTitle>{scenarioComparison.comparison_summary}</CardTitle></CardHeader><CardContent>{scenarioComparison.rankings.map((item, index) => <article key={item.scenario_id} className={index === 0 ? "winner" : ""}><span>#{index + 1}</span><div><strong>{item.label}</strong><p>{item.key_tradeoff}</p></div><strong>{item.overall_score.toFixed(0)}</strong></article>)}</CardContent></Card> : <Card className="plain-card comparison-placeholder"><GitCompare /><h3>Your ranking will appear here.</h3><p>Save at least one spot and choose “Rank saved spots.”</p></Card>}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "evidence" && (
+              <div className="space-y-5">
+                <div className="content-heading"><div><p className="eyebrow">Transparency behind the answer</p><h2>Understand the data and tune the setup.</h2><p>Advanced controls live here, away from the main decision flow but available whenever you need them.</p></div></div>
+                <div className="data-setup-grid">
+                  <BusinessResolverPanel municipalityName={municipalityName} radiusKm={radius[0]} currentCatalogBusinessSubcategory={businessSubcategory} businessInputMode={businessInputMode} onBusinessInputModeChange={setBusinessInputMode} customBusinessQuery={customBusinessQuery} onCustomBusinessQueryChange={setCustomBusinessQuery} useCustomBusinessForMap={useCustomBusinessForMap} onUseCustomBusinessForMapChange={setUseCustomBusinessForMap} onBusinessResolutionChange={setBusinessResolution} className="plain-card" />
+                  <ScenarioSupportPanel municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} businessInputMode={businessInputMode} customBusinessQuery={customBusinessQuery} useCustomBusinessForMap={useCustomBusinessForMap} businessResolution={businessResolution} />
+                </div>
+                <Card className="plain-card trust-card"><CardHeader><div><p className="eyebrow">Evidence confidence</p><CardTitle>What is observed and what is estimated</CardTitle></div><Badge variant="outline" className={credibilityClass(credibility?.confidence_level)}>{credibility?.overall_confidence_score?.toFixed(0) ?? "—"}/100 · {credibility?.confidence_level || "Unknown"}</Badge></CardHeader><CardContent className="trust-columns"><div><h3><Database />Observed inputs</h3>{(credibility?.observed_inputs ?? []).slice(0, 5).map((item) => <article key={item.field_name}><strong>{item.label}</strong><p>{item.user_note}</p></article>)}</div><div><h3><BrainCircuit />Estimated or modelled</h3>{(credibility?.proxy_estimated_inputs ?? []).slice(0, 5).map((item) => <article key={item.field_name}><strong>{item.label}</strong><p>{item.user_note}</p></article>)}</div></CardContent></Card>
+                <div className="system-grid"><Card className="plain-card"><CardHeader><CardTitle>System check</CardTitle><p>Verify the services behind this workspace.</p></CardHeader><CardContent><Button variant="outline" className="rounded-full" onClick={handleRunValidation} disabled={isValidating}>{isValidating ? "Checking…" : "Run system check"}</Button>{systemValidation && <div className="validation-list">{systemValidation.checks.map((check) => <p key={check.name} className={check.status === "passed" ? "pass" : "fail"}>{check.status === "passed" ? "PASS" : "CHECK"}<span>{check.name}</span></p>)}</div>}</CardContent></Card><Card className="plain-card"><CardHeader><CardTitle>Prediction model</CardTitle><p>Health and freshness of the feasibility engine.</p></CardHeader><CardContent className="model-status"><span className={modelStatus?.status === "ready" ? "ready" : ""}>{modelStatus?.status || "Unavailable"}</span><p>{modelStatus?.important_note || "Model status details are not available."}</p></CardContent></Card></div>
+              </div>
+            )}
+          </motion.section>
         </AnimatePresence>
+      </main>
 
-        {/* Floating circular toggle button */}
-        <button
-          type="button"
-          onClick={() => setIsChatOpen(!isChatOpen)}
-          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
-            isChatOpen
-              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              : "bg-primary text-primary-foreground hover:bg-primary/95 shadow-primary/20 hover:scale-105"
-          }`}
-          title="Toggle Assistant"
-        >
-          {isChatOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6 animate-pulse" />}
-        </button>
+      <div className="assistant-dock">
+        <AnimatePresence>{isChatOpen && <motion.div initial={{ opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }} className="assistant-panel"><div className="assistant-panel-header"><div><span className="assistant-avatar"><BrainCircuit /></span><div><strong>BestSpot assistant</strong><p>Answers from this location</p></div></div><button type="button" onClick={() => setIsChatOpen(false)} aria-label="Close assistant"><X /></button></div><div className="assistant-panel-body"><ScenarioAIChat municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} /></div></motion.div>}</AnimatePresence>
+        <button type="button" className={`assistant-toggle ${isChatOpen ? "open" : ""}`} onClick={() => setIsChatOpen(!isChatOpen)} aria-label={isChatOpen ? "Close BestSpot assistant" : "Ask BestSpot assistant"}>{isChatOpen ? <X /> : <><MessageSquare /><span>Ask BestSpot</span></>}</button>
       </div>
     </div>
   );

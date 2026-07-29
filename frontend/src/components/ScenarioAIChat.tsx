@@ -17,7 +17,7 @@ type AIStatusResponse = {
   default_model?: string;
   defaultModel?: string;
   message?: string;
-  // AI health details
+  // Assistant availability details
   ollama_version?: string | null;
   model_installed?: boolean;
   structured_outputs?: boolean;
@@ -161,7 +161,7 @@ export default function ScenarioAIChat({
   const usedSignals = normalizeSignals(answer);
   const limitations = normalizeLimitations(answer);
 
-  // AI health: structured outputs are what keep local-model JSON reliable.
+  // Assistant availability: structured outputs are what keep local-model JSON reliable.
   const structuredOutputs = aiStatus?.structured_outputs === true;
   const ollamaVersion = aiStatus?.ollama_version || null;
   const healthWarnings = aiStatus?.warnings ?? [];
@@ -173,7 +173,7 @@ export default function ScenarioAIChat({
           <div>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <BrainCircuit className="h-5 w-5 text-primary" />
-              Ask BestSpot AI
+              Ask BestSpot
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
               Ask follow-up questions about {scenarioLabel}. Answers use BestSpot scenario data, evidence, credibility, and recommendations.
@@ -189,7 +189,7 @@ export default function ScenarioAIChat({
                   : "border-accent/30 text-accent"
               }
             >
-              AI {statusLabel}
+              Assistant {statusLabel}
             </Badge>
             <Badge variant="outline" className="border-border text-muted-foreground">
               {modelLabel}
@@ -221,7 +221,7 @@ export default function ScenarioAIChat({
           <div className="rounded-xl border border-accent/30 bg-accent/10 p-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-accent">
               <AlertTriangle className="h-4 w-4" />
-              AI health
+              Assistant availability
             </div>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-accent/90">
               {healthWarnings.map((item, index) => (
@@ -265,7 +265,7 @@ export default function ScenarioAIChat({
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            {isAsking ? "Asking" : "Ask AI"}
+            {isAsking ? "Asking" : "Ask BestSpot"}
           </Button>
         </div>
 
@@ -279,7 +279,7 @@ export default function ScenarioAIChat({
         {answer?.answer && (
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
             <p className="text-xs font-mono uppercase tracking-widest text-primary/80">
-              AI response
+              BestSpot response
             </p>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">
               {answer.answer}

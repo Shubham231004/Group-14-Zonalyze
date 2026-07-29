@@ -137,11 +137,10 @@ export default function BusinessResolverPanel({
             Business interpretation
           </p>
           <h3 className="mt-1 text-lg font-semibold text-foreground">
-            User-governed business input
+            How BestSpot reads your idea
           </h3>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Choose a known catalog business for the existing ML prediction flow, or enter a custom
-            business idea so BestSpot can resolve OSM tags for map and competitor evidence.
+            Choose a standard business type for the fullest result, or describe a niche idea so BestSpot can find the right competitors on the map.
           </p>
         </div>
 
@@ -161,12 +160,12 @@ export default function BusinessResolverPanel({
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold text-foreground">Known catalog business</span>
-            <span className="text-xs text-muted-foreground">Current ML-safe mode</span>
+            <span className="text-sm font-semibold text-foreground">Standard business type</span>
+            <span className="text-xs text-muted-foreground">Full score available</span>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{currentCatalogBusinessSubcategory}</p>
           <p className="mt-2 text-xs text-muted-foreground">
-            Uses the existing business catalog assumptions and current prediction pipeline.
+            Uses the complete scoring and comparison data available for this business type.
           </p>
         </button>
 
@@ -181,13 +180,13 @@ export default function BusinessResolverPanel({
         >
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-semibold text-foreground">Custom business idea</span>
-            <span className="text-xs text-muted-foreground">Dynamic OSM evidence</span>
+            <span className="text-xs text-muted-foreground">Custom map search</span>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            Type any specific or niche idea and let local AI resolve OSM tags.
+            Describe a specific or niche idea and BestSpot will interpret what to look for nearby.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            No hardcoded category fallback is used. If AI cannot resolve it, BestSpot asks for review.
+            You will see the interpretation before it changes the competitor map.
           </p>
         </button>
       </div>
@@ -223,9 +222,7 @@ export default function BusinessResolverPanel({
               </button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              The resolver calls the backend <code>/business/resolve</code> endpoint and uses local AI
-              structured output when available. The ML prediction still uses the selected catalog
-              business until custom financial assumptions are added.
+              BestSpot uses the nearest standard business type for financial scoring while your custom idea drives the competitor search.
             </p>
           </div>
 
@@ -257,7 +254,7 @@ export default function BusinessResolverPanel({
                     {resolution.resolution_confidence || "unknown"} · {formatScore(resolution.confidence_score)}
                   </span>
                   <span className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
-                    {resolution.raw_ai_available ? "Ollama resolved" : "AI unavailable"}
+                    {resolution.raw_ai_available ? "Interpretation ready" : "Needs review"}
                   </span>
                 </div>
               </div>
@@ -284,7 +281,7 @@ export default function BusinessResolverPanel({
               </div>
 
               <div className="mt-4">
-                <p className="text-xs text-muted-foreground">Validated OSM tags</p>
+                <p className="text-xs text-muted-foreground">Map categories</p>
                 {(resolution.osm_tags || []).length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {resolution.osm_tags?.map((tag, index) => (
@@ -299,7 +296,7 @@ export default function BusinessResolverPanel({
                   </div>
                 ) : (
                   <p className="mt-1 text-sm text-amber-700">
-                    No validated OSM tags were returned. Map evidence should not use this custom business yet.
+                    BestSpot could not confirm map categories for this idea yet. Review the description before using it.
                   </p>
                 )}
               </div>
@@ -328,9 +325,7 @@ export default function BusinessResolverPanel({
                 <span>
                   <span className="font-semibold text-foreground">Use this interpretation for map evidence</span>
                   <br />
-                  The map will call <code>/geo/market-map</code> with <code>business_query</code> so
-                  validated AI-generated OSM tags can drive competitor/POI lookup. The ML prediction
-                  still uses the known catalog business until custom business assumptions are added.
+                  The competitor map will use this interpretation. The feasibility score will continue to use the nearest standard business type and will label that choice.
                 </span>
               </label>
             </div>

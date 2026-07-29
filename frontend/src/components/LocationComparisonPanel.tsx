@@ -103,7 +103,7 @@ export default function LocationComparisonPanel({
             Compare nearby municipalities and radius options
           </h2>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Rank alternative locations using the same prediction, demand, competition, rent, and risk evidence pipeline that powers the dashboard.
+            Compare alternative locations using the same score, demand, competition, rent, and risk measures as your current spot.
           </p>
         </div>
         <button
