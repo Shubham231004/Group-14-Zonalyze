@@ -1,0 +1,4 @@
+# Development / test dependencies. NOT required to run the app in production.
+# Install with:  pip install -r requirements-dev.txt
+pytest
+httpx        # required by fastapi/starlette TestClient used in tests/

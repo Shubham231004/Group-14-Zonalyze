@@ -1,0 +1,35 @@
+Zonalyze ML Training Report
+================================
+Trained at: 2026-05-06T01:00:58.005649Z
+Rows used: 31328
+Feature count: 38
+
+Risk Classification Metrics
+--------------------------------
+Accuracy: 0.8814
+
+              precision    recall  f1-score   support
+
+        high       0.87      0.91      0.89      2396
+         low       0.93      0.91      0.92      1246
+      medium       0.87      0.84      0.86      2624
+
+    accuracy                           0.88      6266
+   macro avg       0.89      0.89      0.89      6266
+weighted avg       0.88      0.88      0.88      6266
+
+
+Revenue Regression Metrics
+--------------------------------
+MAE: 16026.34
+RMSE: 173807.08
+R2: 0.9241
+
+Feasibility Regression Metrics
+--------------------------------
+MAE: 1.11
+RMSE: 1.83
+R2: 0.9880
+
+Important note:
+Models are trained on simulation-based labels generated from real census features and controlled business assumptions. Predictions should be presented as planning estimates, not guaranteed real-world financial outcomes.

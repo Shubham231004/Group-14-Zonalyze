@@ -8,8 +8,14 @@ venv/
 env/
 backend/Zonalyze/
 
-# Environment files
+# Environment files (all variants, in any directory) — but keep the templates.
 .env
+.env.*
+!.env.example
+*.zip
+*.csv
+*.docx
+*.json
 
 # Node
 node_modules/
@@ -23,8 +29,43 @@ build/
 .DS_Store
 Thumbs.db
 
+# Local AI tooling and video-production workspaces
+.agents/
+.claude/
+videos/
+
 # Logs / test artifacts
 *.log
 .pytest_cache/
 .coverage
 htmlcov/
+
+backend/app/data/
+backend/app/ml/models/
+*.pkl
+
+# OSM extracts for the POI import (hundreds of MB / GB) — never commit; re-download.
+*.pbf
+*.osm.pbf
+
+# --- Track ONLY the small runtime files a fresh clone needs (<200 KB total) ---
+# The large raw data and all *.pkl model weights stay ignored; see DEPLOYMENT.md
+# for how teammates obtain those. The nested rules below re-include specific
+# small files that live under the ignored data/ and models/ directories.
+!backend/app/data/
+backend/app/data/*
+!backend/app/data/market/
+backend/app/data/market/*
+!backend/app/data/market/competition_observations_seed.csv
+!backend/app/data/market/demand_observations_seed.csv
+!backend/app/data/market/lease_cost_observations_seed.csv
+!backend/app/data/processed/
+backend/app/data/processed/*
+!backend/app/data/processed/ontario_csd_selected_features_2021.csv
+!backend/app/data/synthetic/
+backend/app/data/synthetic/*
+!backend/app/data/synthetic/zonalyze_business_taxonomy_seed.csv
+!backend/app/ml/models/
+backend/app/ml/models/*
+!backend/app/ml/models/feature_columns.json
+!backend/app/ml/models/model_metadata.json

@@ -1,11 +1,18 @@
-import { defineConfig } from 'vite'
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
-import babel from '@rolldown/plugin-babel'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// https://vite.dev/config/
+// `__dirname` is not defined in ESM (package.json is "type": "module"), so
+// derive it from import.meta.url. The "@" alias resolves identically to before.
+const projectDir = path.dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig({
-  plugins: [
-    react(),
-    babel({ presets: [reactCompilerPreset()] })
-  ],
-})
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": path.resolve(projectDir, "src"),
+    },
+  },
+});

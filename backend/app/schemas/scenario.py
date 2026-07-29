@@ -2,6 +2,6 @@ from pydantic import BaseModel, Field
 
 
 class AnalyzeScenarioRequest(BaseModel):
-    selected_zone: str = Field(..., min_length=2, max_length=100)
-    selected_business_type: str = Field(..., min_length=2, max_length=100)
-    radius_km: float = Field(..., gt=0, le=50)
+    municipality_name: str = Field(..., example="Kitchener")
+    business_subcategory: str = Field(..., example="Indian Grocery Store")
+    radius_km: float = Field(..., ge=1, le=25, example=5)
