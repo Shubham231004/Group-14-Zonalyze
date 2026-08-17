@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
+import SiteFooter from "@/components/SiteFooter";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <div className="scanline" />
         <Toaster />
         <Router />
+        <SiteFooter />
       </TooltipProvider>
     </QueryClientProvider>
   );

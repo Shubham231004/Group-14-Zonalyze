@@ -40,7 +40,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useMotionValueEvent,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+} from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +99,14 @@ import {
 const DEFAULT_MUNICIPALITY = "Kitchener";
 const DEFAULT_BUSINESS = "Indian Grocery Store";
 const DEFAULT_RADIUS = 5;
+const DASHBOARD_TAB_ORDER = ["map", "overview", "benchmarks", "history"] as const;
+type DashboardTab = (typeof DASHBOARD_TAB_ORDER)[number];
+
+const TAB_TRANSITION_VARIANTS = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 26, filter: "blur(5px)" }),
+  center: { opacity: 1, x: 0, filter: "blur(0px)" },
+  exit: (direction: number) => ({ opacity: 0, x: direction * -18, filter: "blur(3px)" }),
+};
 
 function indicatorLabelForCompetition(indicator: string) {
   if (indicator === "green") return "LOW";
@@ -293,8 +308,38 @@ export default function Dashboard() {
 
   // Redesign & loader state managers
   const [isScenarioSelected, setIsScenarioSelected] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "map" | "benchmarks" | "history">("map");
+  const [activeTab, setActiveTab] = useState<DashboardTab>("map");
+  const [tabDirection, setTabDirection] = useState(1);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
+  const { scrollY, scrollYProgress } = useScroll();
+  const smoothScrollProgress = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 28,
+    mass: 0.25,
+  });
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    setIsHeaderScrolled(latest > 24);
+  });
+
+  const handleTabChange = (nextTab: DashboardTab) => {
+    if (nextTab === activeTab) return;
+    setTabDirection(
+      DASHBOARD_TAB_ORDER.indexOf(nextTab) > DASHBOARD_TAB_ORDER.indexOf(activeTab) ? 1 : -1,
+    );
+    setActiveTab(nextTab);
+  };
+
+  const revealMotion = {
+    initial: shouldReduceMotion ? false : { opacity: 0, y: 20 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, amount: 0.12 },
+    transition: {
+      duration: shouldReduceMotion ? 0 : 0.55,
+      ease: [0.22, 1, 0.36, 1] as const,
+    },
+  };
 
   // Simulated Loader Progress States
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -854,9 +899,41 @@ export default function Dashboard() {
 
   return (
     <div className="workspace-page">
+      <motion.div
+        className="workspace-scroll-progress"
+        style={{ scaleX: shouldReduceMotion ? scrollYProgress : smoothScrollProgress }}
+      />
+      <div className="workspace-ambient-rail workspace-ambient-rail--left" aria-hidden="true">
+        <span>Ontario market intelligence</span><i /><i /><i />
+      </div>
+      <div className="workspace-ambient-rail workspace-ambient-rail--right" aria-hidden="true">
+        <span>Live decision workspace</span><i /><i /><i />
+      </div>
       {isUpdating && <div className="workspace-sync-bar" />}
-      <header className="workspace-header">
+      <div className={`workspace-top-brand ${isHeaderScrolled ? "is-hidden" : ""}`} aria-hidden="true">
+        <BrandLogo size="compact" />
+      </div>
+      <header className={`workspace-header ${isHeaderScrolled ? "is-scrolled" : "is-top"}`}>
         <div className="app-brand"><BrandLogo size="compact" /></div>
+        <motion.section
+          className="scenario-ribbon"
+          initial={shouldReduceMotion ? false : { opacity: 0, y: -12, scale: 0.99 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="scenario-ribbon-main"><span className="scenario-ribbon-pin"><MapPin /></span><div><p>Active location</p><h2>{businessInputMode === "custom" && customBusinessQuery ? customBusinessQuery : businessSubcategory} in {municipalityName}</h2><span>{siteAddress.trim() || "City-centre search"} · {radius[0]} km customer reach</span></div></div>
+          <div className="scenario-ribbon-controls">
+            <div className="scenario-control-intro">
+              <span className="scenario-control-icon"><Target /></span>
+              <div><p>Search area</p><span>Controls map coverage</span></div>
+            </div>
+            <div className="mini-radius">
+              <div className="mini-radius-heading"><span>Customer reach</span><strong>{radius[0]} km</strong></div>
+              <Slider aria-label="Customer reach radius in kilometres" value={radius} onValueChange={setRadius} min={1} max={25} step={1} />
+            </div>
+            <Button variant="outline" className="rounded-full" onClick={() => setIsScenarioSelected(false)}>Edit search</Button>
+          </div>
+        </motion.section>
         <div className="workspace-actions">
           <span className="sync-status"><Signal className={isUpdating ? "animate-pulse" : ""} />{isUpdating ? "Updating your result" : `Updated ${lastUpdate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}</span>
           <Button variant="outline" className="rounded-full" onClick={handleExport} disabled={isExporting}><Download />{isExporting ? "Preparing…" : "Export"}</Button>
@@ -865,26 +942,50 @@ export default function Dashboard() {
       </header>
 
       <main className="workspace-shell">
-        <section className="scenario-ribbon">
-          <div className="scenario-ribbon-main"><span className="scenario-ribbon-pin"><MapPin /></span><div><p>Active location</p><h2>{businessInputMode === "custom" && customBusinessQuery ? customBusinessQuery : businessSubcategory} in {municipalityName}</h2><span>{siteAddress.trim() || "City-centre search"} · {radius[0]} km customer reach</span></div></div>
-          <div className="scenario-ribbon-controls"><div className="mini-radius"><span>Reach</span><Slider value={radius} onValueChange={setRadius} min={1} max={25} step={1} /><strong>{radius[0]} km</strong></div><Button variant="ghost" className="rounded-full" onClick={() => setIsScenarioSelected(false)}>Change search</Button></div>
-        </section>
-
         <nav className="workspace-tabs" aria-label="Analysis sections">
-          {tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={activeTab === id ? "active" : ""} onClick={() => setActiveTab(id)}><Icon />{label}{id === "history" && scenarioHistory.length > 0 ? <span>{scenarioHistory.length}</span> : null}</button>)}
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={activeTab === id ? "active" : ""}
+              onClick={() => handleTabChange(id)}
+              aria-current={activeTab === id ? "page" : undefined}
+            >
+              {activeTab === id ? (
+                <motion.i
+                  className="workspace-tab-indicator"
+                  layoutId="workspace-active-tab"
+                  transition={shouldReduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
+                  aria-hidden="true"
+                />
+              ) : null}
+              <Icon />
+              <span className="workspace-tab-label">{label}</span>
+              {id === "history" && scenarioHistory.length > 0 ? <span className="workspace-tab-count">{scenarioHistory.length}</span> : null}
+            </button>
+          ))}
         </nav>
 
-        <AnimatePresence mode="wait">
-          <motion.section key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }} className="workspace-content">
+        <AnimatePresence initial={false} mode="popLayout" custom={tabDirection}>
+          <motion.section
+            key={activeTab}
+            custom={tabDirection}
+            variants={TAB_TRANSITION_VARIANTS}
+            initial={shouldReduceMotion ? false : "enter"}
+            animate="center"
+            exit={shouldReduceMotion ? undefined : "exit"}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] }}
+            className="workspace-content"
+          >
             {activeTab === "map" && (
               <div className="space-y-5">
-                <section className="decision-strip">
+                <motion.section {...revealMotion} className="decision-strip">
                   <div className="decision-score"><strong>{feasibilityScore.toFixed(0)}</strong><span>/100</span></div>
                   <div className="decision-copy"><p className="eyebrow">Your first read</p><h2>{recommendationLabel}</h2><p>{recommendationDecision?.decision_summary || explanation?.feasibility_explanation || "Your feasibility result is ready. Explore the map and evidence below."}</p></div>
-                  <div className="decision-actions"><Button variant="outline" className="rounded-full" onClick={handleSaveScenario} disabled={isSavingScenario}><Save />{isSavingScenario ? "Saving…" : "Save spot"}</Button><Button className="rounded-full" onClick={() => setActiveTab("history")}><GitCompare />Compare</Button></div>
-                </section>
+                  <div className="decision-actions"><Button variant="outline" className="rounded-full" onClick={handleSaveScenario} disabled={isSavingScenario}><Save />{isSavingScenario ? "Saving…" : "Save spot"}</Button><Button className="rounded-full" onClick={() => handleTabChange("history")}><GitCompare />Compare</Button></div>
+                </motion.section>
 
-                <div className="map-workspace-grid">
+                <motion.div {...revealMotion} className="map-workspace-grid">
                   <div className="map-primary-column">
                     <div className="map-section-heading"><div><p className="eyebrow">See what surrounds the spot</p><h2>Competition on the map</h2></div><span className="map-source-badge"><span />{competitionIsLiveOsm ? "Live market evidence" : "Market evidence"}</span></div>
                     {geoContext ? <div className={`anchor-note ${geoContext.anchor_type === "address" ? "address" : "city"}`}><MapPin />{geoContext.anchor_note || (geoContext.anchor_type === "address" ? `Centred on ${geoContext.resolved_address}` : `Centred on ${geoContext.municipality_name} city centre.`)}</div> : null}
@@ -894,49 +995,49 @@ export default function Dashboard() {
                   <aside className="map-insight-rail">
                     <div className="insight-card insight-card-primary"><div className="insight-card-icon"><Store /></div><p>Nearby competition</p><strong>{formatNumber(competitorCount)}</strong><span>{competitionEvidence?.nearest_competitor_distance_km != null ? `Nearest is ${competitionEvidence.nearest_competitor_distance_km.toFixed(1)} km away` : "Inside your selected reach"}</span><div className="meter"><i style={{ width: `${Math.min(100, competitionScore)}%` }} /></div><small>{indicatorLabelForCompetition(dashboardData.competition_monitor.indicator)} pressure</small></div>
                     <div className="insight-card"><div className="insight-card-icon green"><Users /></div><p>Reachable people</p><strong>{formatNumber(populationValue)}</strong><span>{demandEvidence?.target_customer_pool_estimate ? `${formatNumber(demandEvidence.target_customer_pool_estimate)} likely target customers` : "Local population in the data view"}</span><div className="meter green"><i style={{ width: `${Math.min(100, demandScore)}%` }} /></div><small>Demand score {demandScore.toFixed(0)}/100</small></div>
-                    <div className="insight-card"><div className="insight-card-icon ink"><DollarSign /></div><p>Monthly lease range</p><strong className="text-2xl">{leaseCostEvidence ? formatCurrency(leaseCostEvidence.median_monthly_lease_cost) : "N/A"}</strong><span>{leaseCostEvidence ? `${formatCurrency(leaseCostEvidence.low_monthly_lease_cost)} – ${formatCurrency(leaseCostEvidence.high_monthly_lease_cost)}` : "Open Costs & market for estimates"}</span><button type="button" onClick={() => setActiveTab("benchmarks")}>See cost picture <ChevronRight /></button></div>
+                    <div className="insight-card"><div className="insight-card-icon ink"><DollarSign /></div><p>Monthly lease range</p><strong className="text-2xl">{leaseCostEvidence ? formatCurrency(leaseCostEvidence.median_monthly_lease_cost) : "N/A"}</strong><span>{leaseCostEvidence ? `${formatCurrency(leaseCostEvidence.low_monthly_lease_cost)} – ${formatCurrency(leaseCostEvidence.high_monthly_lease_cost)}` : "Open Costs & market for estimates"}</span><button type="button" onClick={() => handleTabChange("benchmarks")}>See cost picture <ChevronRight /></button></div>
                   </aside>
-                </div>
+                </motion.div>
               </div>
             )}
 
             {activeTab === "overview" && (
               <div className="verdict-layout">
-                <section className="verdict-hero-card">
+                <motion.section {...revealMotion} className="verdict-hero-card">
                   <div className="verdict-ring"><strong>{feasibilityScore.toFixed(0)}</strong><span>out of 100</span></div>
                   <div className="verdict-main"><p className="eyebrow">BestSpot verdict</p><h2>{recommendationLabel}</h2><p>{recommendationDecision?.decision_rationale || explanation?.feasibility_explanation}</p><div className="verdict-guidance"><Navigation /><span>{recommendationDecision?.action_guidance || "Use the evidence below to confirm the location before making a lease commitment."}</span></div></div>
-                </section>
-                <section className="metric-row">
+                </motion.section>
+                <motion.section {...revealMotion} className="metric-row">
                   <article><DollarSign /><p>Predicted monthly net</p><strong>{formatCurrency(ml?.predicted_monthly_net_revenue)}</strong><span className={indicatorTextClass(dashboardData.revenue_monitor.indicator)}>{indicatorLabelForRevenue(dashboardData.revenue_monitor.indicator)} outlook</span></article>
                   <article><AlertTriangle /><p>Business risk</p><strong>{ml?.predicted_risk_class?.replaceAll("_", " ") || "N/A"}</strong><span className={indicatorTextClass(dashboardData.risk_monitor.indicator)}>{indicatorLabelForRisk(dashboardData.risk_monitor.indicator)} risk</span></article>
                   <article><ShieldCheck /><p>Decision confidence</p><strong>{recommendationDecision?.decision_confidence_score?.toFixed(0) ?? credibility?.overall_confidence_score?.toFixed(0) ?? "N/A"}<small>/100</small></strong><span>{credibility?.confidence_level || "Evidence based"} confidence</span></article>
-                </section>
-                <div className="verdict-detail-grid">
+                </motion.section>
+                <motion.div {...revealMotion} className="verdict-detail-grid">
                   <Card className="plain-card"><CardHeader><CardTitle>What helps this spot</CardTitle></CardHeader><CardContent className="factor-list positive">{(recommendationDecision?.major_strengths || explanation?.top_positive_factors || []).slice(0, 5).map((factor) => <p key={factor}><span><TrendingUp /></span>{factor}</p>)}</CardContent></Card>
                   <Card className="plain-card"><CardHeader><CardTitle>What needs a closer look</CardTitle></CardHeader><CardContent className="factor-list caution">{(recommendationDecision?.major_concerns || explanation?.top_negative_factors || []).slice(0, 5).map((factor) => <p key={factor}><span><AlertTriangle /></span>{factor}</p>)}</CardContent></Card>
-                </div>
-                <Card className="plain-card market-profile"><CardHeader><div><p className="eyebrow">People around the spot</p><CardTitle>Local market profile</CardTitle></div></CardHeader><CardContent className="profile-grid"><div><span>Population</span><strong>{formatNumber(populationValue)}</strong></div><div><span>Median household income</span><strong>{formatCurrency(medianIncome)}</strong></div><div><span>Population density</span><strong>{formatNumber(density)}<small>/km²</small></strong></div><div><span>Students</span><strong>{studentPct.toFixed(1)}%</strong></div><div><span>Families</span><strong>{familiesPct.toFixed(1)}%</strong></div><div><span>Retirees</span><strong>{retireesPct.toFixed(1)}%</strong></div></CardContent></Card>
+                </motion.div>
+                <motion.div {...revealMotion}><Card className="plain-card market-profile"><CardHeader><div><p className="eyebrow">People around the spot</p><CardTitle>Local market profile</CardTitle></div></CardHeader><CardContent className="profile-grid"><div><span>Population</span><strong>{formatNumber(populationValue)}</strong></div><div><span>Median household income</span><strong>{formatCurrency(medianIncome)}</strong></div><div><span>Population density</span><strong>{formatNumber(density)}<small>/km²</small></strong></div><div><span>Students</span><strong>{studentPct.toFixed(1)}%</strong></div><div><span>Families</span><strong>{familiesPct.toFixed(1)}%</strong></div><div><span>Retirees</span><strong>{retireesPct.toFixed(1)}%</strong></div></CardContent></Card></motion.div>
               </div>
             )}
 
             {activeTab === "benchmarks" && (
               <div className="space-y-5">
-                <div className="content-heading"><div><p className="eyebrow">Money and market pressure</p><h2>Know the operating picture before the lease.</h2><p>These ranges turn local evidence into planning numbers. They are estimates, clearly separated from observed data.</p></div></div>
-                <section className="evidence-summary-grid">
+                <motion.div {...revealMotion} className="content-heading"><div><p className="eyebrow">Money and market pressure</p><h2>Know the operating picture before the lease.</h2><p>These ranges turn local evidence into planning numbers. They are estimates, clearly separated from observed data.</p></div></motion.div>
+                <motion.section {...revealMotion} className="evidence-summary-grid">
                   <article><div className="summary-icon"><TrendingUp /></div><p>Demand</p><strong>{demandScore.toFixed(0)}<small>/100</small></strong><span>{demandEvidence?.demand_level || breakdown?.demand_analysis?.level || "Market signal"}</span></article>
                   <article><div className="summary-icon red"><Store /></div><p>Competition</p><strong>{competitionScore.toFixed(0)}<small>/100</small></strong><span>{competitorCount} observed nearby</span></article>
                   <article><div className="summary-icon ink"><DollarSign /></div><p>Rent pressure</p><strong>{costScore.toFixed(0)}<small>/100</small></strong><span>{leaseCostEvidence?.commercial_cost_pressure_level || breakdown?.lease_cost_analysis?.level || "Estimated"}</span></article>
                   <article><div className="summary-icon amber"><Activity /></div><p>Foot traffic</p><strong>{demandEvidence?.foot_traffic_proxy_index?.toFixed(0) ?? "N/A"}</strong><span>Public activity signal</span></article>
-                </section>
-                <OperatingProfilePanel municipalityName={municipalityName} radiusKm={radius[0]} businessSubcategory={businessSubcategory} businessQuery={customBusinessQuery} businessResolution={businessResolution as unknown as Record<string, unknown> | null} customBusinessMapActive={businessInputMode === "custom" && useCustomBusinessForMap} initialProfile={operatingProfile} />
+                </motion.section>
+                <motion.div {...revealMotion}><OperatingProfilePanel municipalityName={municipalityName} radiusKm={radius[0]} businessSubcategory={businessSubcategory} businessQuery={customBusinessQuery} businessResolution={businessResolution as unknown as Record<string, unknown> | null} customBusinessMapActive={businessInputMode === "custom" && useCustomBusinessForMap} initialProfile={operatingProfile} /></motion.div>
               </div>
             )}
 
             {activeTab === "history" && (
               <div className="space-y-5">
-                <div className="content-heading compare-heading"><div><p className="eyebrow">Your strongest decision tool</p><h2>Compare every spot on equal terms.</h2><p>Save this result, explore another city or radius, then rank the options together.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" className="rounded-full" onClick={handleSaveScenario} disabled={isSavingScenario}><Save />{isSavingScenario ? "Saving…" : "Save current spot"}</Button><Button className="rounded-full" onClick={handleCompareScenarios} disabled={isComparingScenarios || scenarioHistory.length < 1}><GitCompare />{isComparingScenarios ? "Comparing…" : "Rank saved spots"}</Button></div></div>
-                <LocationComparisonPanel municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} onApplyScenario={({ municipality_name, business_subcategory, radius_km }) => { setSiteAddress(""); setMunicipalityName(municipality_name); setBusinessSubcategory(business_subcategory); setRadius([radius_km]); setActiveTab("map"); }} />
-                <div className="saved-spots-layout">
+                <motion.div {...revealMotion} className="content-heading compare-heading"><div><p className="eyebrow">Your strongest decision tool</p><h2>Compare every spot on equal terms.</h2><p>Save this result, explore another city or radius, then rank the options together.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" className="rounded-full" onClick={handleSaveScenario} disabled={isSavingScenario}><Save />{isSavingScenario ? "Saving…" : "Save current spot"}</Button><Button className="rounded-full" onClick={handleCompareScenarios} disabled={isComparingScenarios || scenarioHistory.length < 1}><GitCompare />{isComparingScenarios ? "Comparing…" : "Rank saved spots"}</Button></div></motion.div>
+                <motion.div {...revealMotion}><LocationComparisonPanel municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} onApplyScenario={({ municipality_name, business_subcategory, radius_km }) => { setSiteAddress(""); setMunicipalityName(municipality_name); setBusinessSubcategory(business_subcategory); setRadius([radius_km]); handleTabChange("map"); }} /></motion.div>
+                <motion.div {...revealMotion} className="saved-spots-layout">
                   <Card className="plain-card">
                     <CardHeader className="flex-row items-center justify-between">
                       <div><p className="eyebrow">Saved searches</p><CardTitle>{scenarioHistory.length} spot{scenarioHistory.length === 1 ? "" : "s"}</CardTitle></div>
@@ -967,7 +1068,7 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
                   {scenarioComparison ? <Card className="plain-card comparison-result"><CardHeader><p className="eyebrow">BestSpot ranking</p><CardTitle>{scenarioComparison.comparison_summary}</CardTitle></CardHeader><CardContent>{scenarioComparison.rankings.map((item, index) => <article key={item.scenario_id} className={index === 0 ? "winner" : ""}><span>#{index + 1}</span><div><strong>{item.label}</strong><p>{item.key_tradeoff}</p></div><strong>{item.overall_score.toFixed(0)}</strong></article>)}</CardContent></Card> : <Card className="plain-card comparison-placeholder"><GitCompare /><h3>Your ranking will appear here.</h3><p>Save at least one spot and choose “Rank saved spots.”</p></Card>}
-                </div>
+                </motion.div>
               </div>
             )}
 

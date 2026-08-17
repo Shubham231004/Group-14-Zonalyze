@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import BrandLogo from "@/components/BrandLogo";
 
@@ -19,6 +20,7 @@ export default function WorkspaceLoadingScreen({
   statusMessage,
 }: WorkspaceLoadingScreenProps) {
   const isAnalysis = mode === "analysis";
+  const shouldReduceMotion = useReducedMotion();
   const [messageIndex, setMessageIndex] = useState(0);
   const progressValue = Math.max(0, Math.min(100, Math.round(progress ?? 0)));
   const isComplete = isAnalysis && progressValue >= 100;
@@ -54,7 +56,7 @@ export default function WorkspaceLoadingScreen({
 
   return (
     <main className="app-loading-shell" aria-busy="true">
-      <section className="workspace-loader" role="status" aria-live="polite" aria-atomic="true">
+      <section className={`workspace-loader${isAnalysis ? " is-analysis" : ""}`} role="status" aria-live="polite" aria-atomic="true">
         <div className="workspace-loader-map" aria-hidden="true">
           <span className="workspace-loader-road workspace-loader-road--one" />
           <span className="workspace-loader-road workspace-loader-road--two" />
@@ -75,7 +77,20 @@ export default function WorkspaceLoadingScreen({
         <div className="workspace-loader-copy">
           <BrandLogo size="large" />
           <p className="eyebrow">{isAnalysis ? "Building your decision view" : "Location intelligence in motion"}</p>
-          <h1 key={headline} className="workspace-loader-headline">{headline}</h1>
+          <div className="workspace-loader-headline-stage">
+            <AnimatePresence initial={false}>
+              <motion.h1
+                key={headline}
+                className="workspace-loader-headline"
+                initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 16, filter: "blur(6px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -14, filter: "blur(5px)" }}
+                transition={{ duration: shouldReduceMotion ? 0 : 0.58, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {headline}
+              </motion.h1>
+            </AnimatePresence>
+          </div>
           <p className="workspace-loader-description">{description}</p>
 
           <div

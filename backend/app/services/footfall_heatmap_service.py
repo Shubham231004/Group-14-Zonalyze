@@ -28,29 +28,46 @@ def build_footfall_heatmap_points(
     *, center_lat: float, center_lng: float, radius_km: float
 ) -> List[FootfallHeatmapPoint]:
     """Return only observed municipal pedestrian counters inside the analysis radius."""
-    rows: list[dict[str, str]] = []
-    # The counter dataset is real municipal open data, not shipped in git (like the
-    # other observation seeds under data/market/) — treat "not deployed yet" the same
-    # as "no counters in this radius" rather than crashing the request.
     if not DATA_PATH.exists():
         return []
+
+    rows: list[dict[str, str]] = []
     with DATA_PATH.open(encoding="utf-8", newline="") as source_file:
         for row in csv.DictReader(source_file):
-            latitude = float(row["latitude"])
-            longitude = float(row["longitude"])
+            try:
+                latitude = float(row["latitude"])
+                longitude = float(row["longitude"])
+                observed_count = float(row["observed_count"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if observed_count <= 0:
+                continue
             if _distance_km(center_lat, center_lng, latitude, longitude) <= radius_km:
                 rows.append(row)
 
     if not rows:
         return []
 
-    max_count = max(float(row["observed_count"]) for row in rows)
+    max_count_by_unit = {
+        unit: max(
+            float(row["observed_count"])
+            for row in rows
+            if row["observed_unit"] == unit
+        )
+        for unit in {row["observed_unit"] for row in rows}
+    }
     return [
         FootfallHeatmapPoint(
             point_id=f"observed-counter-{row['municipality'].lower()}-{row['site_id']}",
             latitude=float(row["latitude"]),
             longitude=float(row["longitude"]),
-            intensity=max(0.18, math.sqrt(float(row["observed_count"]) / max_count)),
+            intensity=max(
+                0.18,
+                math.sqrt(
+                    float(row["observed_count"])
+                    / max_count_by_unit[row["observed_unit"]]
+                ),
+            ),
             evidence_type="observed_pedestrian_count",
             source=row["source"],
             label=row["label"],

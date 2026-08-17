@@ -59,6 +59,7 @@ backend/app/data/market/*
 !backend/app/data/market/competition_observations_seed.csv
 !backend/app/data/market/demand_observations_seed.csv
 !backend/app/data/market/lease_cost_observations_seed.csv
+!backend/app/data/market/observed_footfall_counts.csv
 !backend/app/data/processed/
 backend/app/data/processed/*
 !backend/app/data/processed/ontario_csd_selected_features_2021.csv
