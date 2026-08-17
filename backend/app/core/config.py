@@ -32,8 +32,16 @@ if not DB_PASSWORD:
 
 ENCODED_DB_PASSWORD = quote_plus(DB_PASSWORD)
 
+# Managed hosts (Neon, RDS, etc.) reject plain connections outright, so default
+# to "require" for anything that isn't a local Postgres. Override via
+# DB_SSLMODE if a specific target needs something else (e.g. "verify-full").
+DB_SSLMODE = os.getenv(
+    "DB_SSLMODE", "prefer" if DB_HOST in {"localhost", "127.0.0.1"} else "require"
+)
+
 DATABASE_URL = (
     f"postgresql://{DB_USER}:{ENCODED_DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    f"?sslmode={DB_SSLMODE}"
 )
 # Mapbox token is optional. It is only used as a fallback to reverse-geocode
 # competitor marker addresses when OpenStreetMap does not provide addr:* tags.
