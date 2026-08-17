@@ -11,6 +11,26 @@ import requests
 DEFAULT_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
+# Ollama only exists on a developer's own machine, so every AI panel reads
+# "unavailable" in the cloud deploy. Setting AI_API_KEY routes the same prompts to
+# any OpenAI-compatible hosted API instead; unset = Ollama, exactly as before.
+#
+# Deliberately provider-agnostic (base URL + key + model) rather than hardcoded to
+# one vendor — Gemini, Groq and OpenRouter all speak this protocol and their free
+# tiers differ in ways that matter here. This app sends FEW, LARGE prompts (the
+# operating-profile call runs 4-7k tokens), so tokens-per-minute is the binding
+# limit, not requests-per-day:
+#   Gemini     https://generativelanguage.googleapis.com/v1beta/openai  gemini-3.5-flash
+#              generous free tier; gemini-2.5-flash* returns 404 "no longer available
+#              to new users" as of Nov 2026 -- confirm your live quota in AI Studio,
+#              Google stopped publishing fixed numbers on the pricing page
+#   Groq       https://api.groq.com/openai/v1                           llama-3.3-70b-versatile
+#              6k TPM, 14.4k req/day  <- one profile call can exhaust a minute's budget
+#   OpenRouter https://openrouter.ai/api/v1                             <model>:free
+#              50 req/day without credits
+DEFAULT_AI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+DEFAULT_AI_MODEL = "gemini-3.5-flash-lite"
+
 
 @dataclass
 class LocalAIResult:
@@ -24,8 +44,73 @@ def _base_url() -> str:
     return os.getenv("OLLAMA_BASE_URL", DEFAULT_OLLAMA_BASE_URL).rstrip("/")
 
 
+def _hosted_api_key() -> str:
+    return os.getenv("AI_API_KEY", "").strip()
+
+
+def hosted_ai_enabled() -> bool:
+    return bool(_hosted_api_key())
+
+
+def _hosted_base_url() -> str:
+    return os.getenv("AI_BASE_URL", DEFAULT_AI_BASE_URL).rstrip("/")
+
+
+def _hosted_provider_name() -> str:
+    """Label for status output only — derived from the configured host."""
+    host = _hosted_base_url().split("//")[-1].split("/")[0]
+    for known in ("groq", "openrouter", "googleapis", "openai"):
+        if known in host:
+            return "gemini" if known == "googleapis" else known
+    return host
+
+
 def _default_model() -> str:
+    if hosted_ai_enabled():
+        return os.getenv("AI_MODEL", DEFAULT_AI_MODEL)
     return os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+
+
+def _generate_with_hosted_ai(
+    prompt: str,
+    model: str,
+    timeout_seconds: int,
+    max_tokens: int,
+    json_mode: bool,
+) -> LocalAIResult:
+    """Same contract as the Ollama helpers: never raises, reports failure in the result."""
+    if json_mode and "json" not in prompt.lower():
+        # Some providers 400 in json_object mode unless the prompt mentions JSON.
+        prompt = f"{prompt}\n\nRespond with a single valid JSON object."
+
+    body: Dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.0 if json_mode else float(os.getenv("OLLAMA_TEMPERATURE", "0.2")),
+        "max_tokens": max_tokens,
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+
+    try:
+        response = requests.post(
+            f"{_hosted_base_url()}/chat/completions",
+            json=body,
+            headers={"Authorization": f"Bearer {_hosted_api_key()}"},
+            timeout=timeout_seconds,
+        )
+        response.raise_for_status()
+        choices = response.json().get("choices") or []
+        answer = str((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
+        if not answer:
+            return LocalAIResult(False, "", model, "The hosted AI returned an empty response.")
+        return LocalAIResult(True, answer, model, None)
+    except Exception as exc:
+        detail = str(exc)
+        if isinstance(exc, requests.HTTPError) and exc.response is not None:
+            # The API's own message ("model decommissioned", bad key) beats a bare 400.
+            detail = f"{detail}: {exc.response.text[:300]}"
+        return LocalAIResult(False, "", model, detail)
 
 
 def allowed_models() -> set[str]:
@@ -117,6 +202,56 @@ def _model_is_installed(model: str, models: List[str]) -> bool:
     return model in models or f"{model}:latest" in models
 
 
+def _get_hosted_ai_status() -> Dict[str, Any]:
+    """Same shape as the Ollama status so callers/UI need no changes."""
+    model = _default_model()
+    try:
+        response = requests.get(
+            f"{_hosted_base_url()}/models",
+            headers={"Authorization": f"Bearer {_hosted_api_key()}"},
+            timeout=6,
+        )
+        response.raise_for_status()
+        models = [str(m.get("id")) for m in (response.json().get("data") or []) if m.get("id")]
+    except Exception as exc:
+        return {
+            "status": "unavailable",
+            "provider": _hosted_provider_name(),
+            "base_url": _hosted_base_url(),
+            "default_model": model,
+            "available_models": [],
+            "message": f"Hosted AI is not reachable or the key was rejected: {exc}",
+            "ollama_version": None,
+            "model_installed": False,
+            "structured_outputs": False,
+            "structured_outputs_note": "Unknown — the hosted AI is not reachable.",
+            "warnings": ["Check AI_API_KEY / AI_BASE_URL."],
+        }
+
+    # Gemini's /models list prefixes every id with "models/" (e.g.
+    # "models/gemini-3.5-flash-lite"), but chat/completions takes the bare name —
+    # strip it on both sides so the comparison matches what actually works.
+    bare_models = {m.rsplit("/", 1)[-1] for m in models}
+    model_available = model.rsplit("/", 1)[-1] in bare_models
+    return {
+        "status": "ready" if model_available else "model_missing",
+        "provider": _hosted_provider_name(),
+        "base_url": _hosted_base_url(),
+        "default_model": model,
+        "available_models": models,
+        "message": (
+            f"Hosted AI is ready ({model})."
+            if model_available
+            else f"The hosted AI is reachable, but '{model}' is not in its model list. Set AI_MODEL to one of: {', '.join(models[:5])}"
+        ),
+        "ollama_version": None,
+        "model_installed": model_available,
+        "structured_outputs": True,
+        "structured_outputs_note": "Hosted json_object mode is active — responses are forced to valid JSON.",
+        "warnings": [] if model_available else [f"AI_MODEL='{model}' not offered by the API."],
+    }
+
+
 def get_local_ai_status() -> Dict[str, Any]:
     """Health check for the local AI.
 
@@ -124,6 +259,9 @@ def get_local_ai_status() -> Dict[str, Any]:
     configured model pulled, and is schema-constrained JSON (structured outputs)
     active. Each failure carries the exact command to fix it.
     """
+    if hosted_ai_enabled():
+        return _get_hosted_ai_status()
+
     base_url = _base_url()
     default_model = _default_model()
     models = list_local_models()
@@ -246,6 +384,15 @@ def generate_with_ollama(
     selected_model = model or _default_model()
     timeout = timeout_seconds or int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
 
+    if hosted_ai_enabled():
+        return _generate_with_hosted_ai(
+            prompt,
+            selected_model,
+            timeout,
+            int(os.getenv("OLLAMA_NUM_PREDICT", "700")),
+            json_mode=False,
+        )
+
     try:
         response = requests.post(
             f"{_base_url()}/api/generate",
@@ -310,6 +457,12 @@ def generate_json_with_ollama(
     selected_model = model or _default_model()
     timeout = timeout_seconds or int(os.getenv("OLLAMA_JSON_TIMEOUT_SECONDS", os.getenv("OLLAMA_TIMEOUT_SECONDS", "180")))
     max_tokens = num_predict or int(os.getenv("OLLAMA_JSON_NUM_PREDICT", "2200"))
+
+    if hosted_ai_enabled():
+        # json_object mode, not schema-constrained: the schema is already spelled out
+        # in these prompts, and a hosted frontier-class model follows it far more reliably than the
+        # small local model this schema mode was added to rescue.
+        return _generate_with_hosted_ai(prompt, selected_model, timeout, max_tokens, json_mode=True)
 
     use_schema = (
         json_schema is not None
