@@ -7,7 +7,6 @@ import {
   BarChart4,
   BrainCircuit,
   Cpu,
-  Database,
   Gauge,
   DollarSign,
   Download,
@@ -16,10 +15,8 @@ import {
   Save,
   MapPin,
   Navigation, 
-  Settings,
   Signal,
   ShieldCheck,
-  Info,
   Store,
   Target,
   TrendingUp,
@@ -28,6 +25,7 @@ import {
   X,
   ChevronRight,
   HelpCircle,
+  Trash2,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -44,7 +42,6 @@ import {
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -61,28 +58,26 @@ import { useToast } from "@/hooks/use-toast";
 
 import MarketMap from "@/components/MarketMap";
 import ScenarioAIChat from "@/components/ScenarioAIChat";
-import ScenarioSupportPanel from "@/components/ScenarioSupportPanel";
 import AccountButton from "@/components/AccountButton";
-import BusinessResolverPanel, {
-  type BusinessInputMode,
-} from "@/components/BusinessResolverPanel";
+import BrandLogo from "@/components/BrandLogo";
+import type { BusinessInputMode } from "@/components/BusinessResolverPanel";
 
 import OperatingProfilePanel from "@/components/OperatingProfilePanel";
 import LocationComparisonPanel from "@/components/LocationComparisonPanel";
+import WorkspaceLoadingScreen from "@/components/WorkspaceLoadingScreen";
 
 import {
   analyzeScenario,
   clearScenarioHistory,
   compareScenarioHistory,
+  deleteScenarioFromHistory,
   fetchBusinessSubcategories,
   fetchDashboardSummary,
   fetchMunicipalities,
-  fetchModelStatus,
   fetchGeospatialMarketMap,
   fetchScenarioHistory,
   generateFeasibilityReport,
   resolveBusiness,
-  runSystemValidation,
   saveScenarioToHistory,
   type BusinessResolutionResponse,
   type BusinessSubcategoryOption,
@@ -90,10 +85,8 @@ import {
   type GeospatialMarketContext,
   type GeospatialMarketMapRequest,
   type MunicipalityOption,
-  type ModelStatusResponse,
   type ScenarioComparisonResponse,
   type ScenarioHistoryItem,
-  type SystemValidationResponse,
 } from "@/services/api";
 
 const DEFAULT_MUNICIPALITY = "Kitchener";
@@ -202,13 +195,6 @@ function formatPercent(value?: number | null) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function credibilityClass(level?: string) {
-  if (level === "strong") return "text-emerald-600 border-emerald-400/30 bg-emerald-500/5";
-  if (level === "moderate") return "text-primary border-primary/30 bg-primary/5";
-  if (level === "limited") return "text-accent border-accent/30 bg-accent/5";
-  return "text-destructive border-destructive/30 bg-destructive/5";
-}
-
 function readableRecommendation(value?: string) {
   if (!value) return "No recommendation";
   return value.replace(/_/g, " ").toUpperCase();
@@ -292,10 +278,6 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [isUpdating, setIsUpdating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
-  const [systemValidation, setSystemValidation] =
-    useState<SystemValidationResponse | null>(null);
-  const [modelStatus, setModelStatus] = useState<ModelStatusResponse | null>(null);
   const [scenarioHistory, setScenarioHistory] = useState<ScenarioHistoryItem[]>([]);
   const [geoContext, setGeoContext] = useState<GeospatialMarketContext | null>(null);
   // The market map loads independently of the scenario analysis so a slow or
@@ -306,11 +288,12 @@ export default function Dashboard() {
     useState<ScenarioComparisonResponse | null>(null);
   const [isSavingScenario, setIsSavingScenario] = useState(false);
   const [isComparingScenarios, setIsComparingScenarios] = useState(false);
+  const [deletingScenarioId, setDeletingScenarioId] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Redesign & loader state managers
   const [isScenarioSelected, setIsScenarioSelected] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "map" | "evidence" | "benchmarks" | "history">("map");
+  const [activeTab, setActiveTab] = useState<"overview" | "map" | "benchmarks" | "history">("map");
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Simulated Loader Progress States
@@ -467,16 +450,14 @@ export default function Dashboard() {
         // Only UI-critical calls block the initial render. The market map is
         // deliberately excluded so the analysis controls appear immediately
         // even when Overpass is slow.
-        const [municipalitiesData, businessData, modelStatusData, historyData] = await Promise.all([
+        const [municipalitiesData, businessData, historyData] = await Promise.all([
           fetchMunicipalities(),
           fetchBusinessSubcategories(),
-          fetchModelStatus().catch(() => null),
           fetchScenarioHistory().catch(() => null),
         ]);
 
         setMunicipalityOptions(municipalitiesData.municipalities);
         setBusinessOptions(businessData.business_subcategories);
-        setModelStatus(modelStatusData);
         setScenarioHistory(historyData?.scenarios ?? []);
 
         let firstDashboard: DashboardSummaryResponse;
@@ -584,26 +565,8 @@ export default function Dashboard() {
   // so the workspace appears fully populated instead of animating on a fake timer.
   const handleStartAnalysis = async () => {
     setIsAnalyzing(true);
-    setLoadingProgress(0);
-    setLoadingStep("Loading Statistics Canada Census demographic datasets...");
-
-    const stepMessages: Record<number, string> = {
-      15: "Connecting to PostgreSQL; retrieving catchment populations...",
-      35: "Running Random Forest ML estimators for feasibility & net revenue...",
-      55: "Resolving the analysis location & business interpretation...",
-      72: "Fetching live map evidence from OpenStreetMap...",
-      88: "Compiling the decision-support recommendation...",
-    };
-
-    // Ease the bar toward 90% while the real work runs; hold there until data lands.
-    const interval = window.setInterval(() => {
-      setLoadingProgress((prev) => {
-        const next = prev + 1;
-        if (next >= 90) return 90;
-        if (stepMessages[next]) setLoadingStep(stepMessages[next]);
-        return next;
-      });
-    }, 45);
+    setLoadingProgress(8);
+    setLoadingStep("Connecting Census, business, and local market data...");
 
     try {
       // Feasibility numbers (ML/census) — fast, no external APIs.
@@ -614,6 +577,8 @@ export default function Dashboard() {
       });
       setDashboardData(response);
       setLastUpdate(new Date());
+      setLoadingProgress(55);
+      setLoadingStep("The feasibility model is ready. Mapping nearby competitors...");
 
       // Every completed search lands in the signed-in user's history (fire and
       // forget — a failed save must never break the analysis), so returning
@@ -630,11 +595,20 @@ export default function Dashboard() {
       // Map/competitors — bounded so a slow or rate-limited Overpass can't stall the
       // whole screen. If it isn't ready in time, the workspace still opens and the
       // map finishes (or shows its honest retry state) on its own.
+      setLoadingProgress(72);
+      setLoadingStep("Reading live map evidence inside your selected radius...");
       const mapLoad = loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest);
       await Promise.race([
         mapLoad,
         new Promise((resolve) => window.setTimeout(resolve, 18000)),
       ]);
+      setLoadingProgress(94);
+      setLoadingStep("Almost done — assembling your recommendation and map...");
+      setLoadingProgress(100);
+      setLoadingStep("Your location analysis is ready.");
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
+      setActiveTab("map"); // land on the map — the competitors ARE the excitement
+      setIsScenarioSelected(true);
     } catch (error) {
       toast({
         title: "Analysis failed",
@@ -645,11 +619,6 @@ export default function Dashboard() {
         variant: "destructive",
       });
     } finally {
-      window.clearInterval(interval);
-      setLoadingProgress(100);
-      setLoadingStep("Ready.");
-      setActiveTab("map"); // land on the map — the competitors ARE the excitement
-      setIsScenarioSelected(true);
       setIsAnalyzing(false);
     }
   };
@@ -664,14 +633,11 @@ export default function Dashboard() {
         radius_km: radius[0],
       });
 
-      const blob = new Blob([report.report_text], {
-        type: report.content_type || "text/plain",
-      });
-      const url = window.URL.createObjectURL(blob);
+      const url = window.URL.createObjectURL(report.blob);
       const link = document.createElement("a");
 
       link.href = url;
-      link.download = report.filename || "bestspot-location-report.txt";
+      link.download = report.filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -680,7 +646,7 @@ export default function Dashboard() {
       toast({
         title: "Report exported",
         description:
-          "The feasibility report was generated from the latest backend scenario.",
+          "Your branded BestSpot PDF report is ready.",
         duration: 3000,
       });
     } catch (error) {
@@ -694,36 +660,6 @@ export default function Dashboard() {
       });
     } finally {
       setIsExporting(false);
-    }
-  };
-
-  const handleRunValidation = async () => {
-    try {
-      setIsValidating(true);
-      const validation = await runSystemValidation();
-      setSystemValidation(validation);
-
-      toast({
-        title:
-          validation.overall_status === "passed"
-            ? "System validation passed"
-            : "System validation found issues",
-        description: `${validation.passed_checks}/${validation.total_checks} validation checks passed.`,
-        variant:
-          validation.overall_status === "passed" ? "default" : "destructive",
-        duration: 3500,
-      });
-    } catch (error) {
-      toast({
-        title: "System validation failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Could not run the backend validation check.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsValidating(false);
     }
   };
 
@@ -806,16 +742,30 @@ export default function Dashboard() {
     }
   };
 
+  const handleDeleteScenario = async (scenarioId: string) => {
+    try {
+      setDeletingScenarioId(scenarioId);
+      const history = await deleteScenarioFromHistory(scenarioId);
+      setScenarioHistory(history.scenarios);
+      setScenarioComparison(null);
+      toast({
+        title: "Saved spot deleted",
+        description: "The spot was removed from your comparison history.",
+        duration: 2500,
+      });
+    } catch (error) {
+      toast({
+        title: "Could not delete saved spot",
+        description: error instanceof Error ? error.message : "The saved spot could not be deleted.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingScenarioId(null);
+    }
+  };
+
   if (isInitialLoading) {
-    return (
-      <div className="app-loading-shell">
-        <div className="app-loading-card">
-          <span className="brand-pin text-5xl" aria-hidden />
-          <div><h3>BestSpot</h3><p>Preparing your location workspace…</p></div>
-          <div className="loading-track"><span /></div>
-        </div>
-      </div>
-    );
+    return <WorkspaceLoadingScreen />;
   }
 
   if (!dashboardData) {
@@ -833,21 +783,13 @@ export default function Dashboard() {
 
   if (isAnalyzing) {
     return (
-      <div className="analysis-loading-shell">
-        <div className="analysis-loading-card">
-          <div className="analysis-loading-map" aria-hidden>
-            <div className="analysis-road analysis-road-one" /><div className="analysis-road analysis-road-two" />
-            <div className="analysis-radius" /><span className="brand-pin pin-drop text-5xl" />
-          </div>
-          <div className="analysis-loading-copy">
-            <p className="eyebrow">Building your decision view</p>
-            <h2>Checking {municipalityName} for your {businessSubcategory.toLowerCase()}.</h2>
-            <p>{loadingStep}</p>
-            <div className="analysis-progress"><span style={{ width: `${loadingProgress}%` }} /></div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground"><span>Map · competition · demand · costs</span><strong>{loadingProgress}%</strong></div>
-          </div>
-        </div>
-      </div>
+      <WorkspaceLoadingScreen
+        mode="analysis"
+        municipalityName={municipalityName}
+        businessName={businessInputMode === "custom" && customBusinessQuery ? customBusinessQuery : businessSubcategory}
+        progress={loadingProgress}
+        statusMessage={loadingStep}
+      />
     );
   }
 
@@ -855,7 +797,7 @@ export default function Dashboard() {
     return (
       <div className="scenario-page">
         <header className="app-topbar">
-          <div className="app-brand"><span className="brand-pin text-3xl" aria-hidden /><div><h1>BestSpot<span>.biz</span></h1><p>Location intelligence for your next business</p></div></div>
+          <div className="app-brand"><BrandLogo size="compact" /></div>
           <div className="flex items-center gap-3"><span className="region-badge">Ontario</span><AccountButton /></div>
         </header>
 
@@ -908,14 +850,13 @@ export default function Dashboard() {
     { id: "overview", label: "Verdict", icon: Gauge },
     { id: "benchmarks", label: "Costs & market", icon: DollarSign },
     { id: "history", label: "Compare spots", icon: GitCompare },
-    { id: "evidence", label: "Data & setup", icon: ShieldCheck },
   ] as const;
 
   return (
     <div className="workspace-page">
       {isUpdating && <div className="workspace-sync-bar" />}
       <header className="workspace-header">
-        <div className="app-brand"><span className="brand-pin text-3xl" aria-hidden /><div><h1>BestSpot<span>.biz</span></h1><p>Find the strongest place for your next move</p></div></div>
+        <div className="app-brand"><BrandLogo size="compact" /></div>
         <div className="workspace-actions">
           <span className="sync-status"><Signal className={isUpdating ? "animate-pulse" : ""} />{isUpdating ? "Updating your result" : `Updated ${lastUpdate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}</span>
           <Button variant="outline" className="rounded-full" onClick={handleExport} disabled={isExporting}><Download />{isExporting ? "Preparing…" : "Export"}</Button>
@@ -994,25 +935,42 @@ export default function Dashboard() {
             {activeTab === "history" && (
               <div className="space-y-5">
                 <div className="content-heading compare-heading"><div><p className="eyebrow">Your strongest decision tool</p><h2>Compare every spot on equal terms.</h2><p>Save this result, explore another city or radius, then rank the options together.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" className="rounded-full" onClick={handleSaveScenario} disabled={isSavingScenario}><Save />{isSavingScenario ? "Saving…" : "Save current spot"}</Button><Button className="rounded-full" onClick={handleCompareScenarios} disabled={isComparingScenarios || scenarioHistory.length < 1}><GitCompare />{isComparingScenarios ? "Comparing…" : "Rank saved spots"}</Button></div></div>
-                <LocationComparisonPanel municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} onApplyScenario={({ municipality_name, business_subcategory, radius_km }) => { setMunicipalityName(municipality_name); setBusinessSubcategory(business_subcategory); setRadius([radius_km]); setActiveTab("map"); }} />
+                <LocationComparisonPanel municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} onApplyScenario={({ municipality_name, business_subcategory, radius_km }) => { setSiteAddress(""); setMunicipalityName(municipality_name); setBusinessSubcategory(business_subcategory); setRadius([radius_km]); setActiveTab("map"); }} />
                 <div className="saved-spots-layout">
-                  <Card className="plain-card"><CardHeader className="flex-row items-center justify-between"><div><p className="eyebrow">Saved searches</p><CardTitle>{scenarioHistory.length} spot{scenarioHistory.length === 1 ? "" : "s"}</CardTitle></div>{scenarioHistory.length > 0 && <Button variant="ghost" size="sm" onClick={handleClearHistory}>Clear</Button>}</CardHeader><CardContent className="saved-list">{scenarioHistory.length === 0 ? <div className="empty-saved"><History /><strong>No saved spots yet</strong><p>Save this result, change the location, and you will have a comparison.</p></div> : scenarioHistory.map((item, index) => <article key={item.scenario_id}><span>{index + 1}</span><div><strong>{item.municipality_name}</strong><p>{item.business_subcategory} · {item.radius_km} km</p></div><div><strong>{item.predicted_feasibility_score?.toFixed(0) ?? "—"}</strong><small>/100</small></div></article>)}</CardContent></Card>
+                  <Card className="plain-card">
+                    <CardHeader className="flex-row items-center justify-between">
+                      <div><p className="eyebrow">Saved searches</p><CardTitle>{scenarioHistory.length} spot{scenarioHistory.length === 1 ? "" : "s"}</CardTitle></div>
+                      {scenarioHistory.length > 0 && <Button variant="ghost" size="sm" onClick={handleClearHistory}>Clear</Button>}
+                    </CardHeader>
+                    <CardContent className="saved-list">
+                      {scenarioHistory.length === 0 ? (
+                        <div className="empty-saved"><History /><strong>No saved spots yet</strong><p>Save this result, change the location, and you will have a comparison.</p></div>
+                      ) : scenarioHistory.map((item, index) => (
+                        <article key={item.scenario_id}>
+                          <span>{index + 1}</span>
+                          <div><strong>{item.municipality_name}</strong><p>{item.business_subcategory} · {item.radius_km} km</p></div>
+                          <div className="saved-list-actions">
+                            <div className="saved-score"><strong>{item.predicted_feasibility_score?.toFixed(0) ?? "—"}</strong><small>/100</small></div>
+                            <button
+                              type="button"
+                              className="saved-delete"
+                              onClick={() => handleDeleteScenario(item.scenario_id)}
+                              disabled={deletingScenarioId === item.scenario_id}
+                              aria-label={`Delete ${item.business_subcategory} in ${item.municipality_name}`}
+                              title="Delete saved spot"
+                            >
+                              <Trash2 />
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </CardContent>
+                  </Card>
                   {scenarioComparison ? <Card className="plain-card comparison-result"><CardHeader><p className="eyebrow">BestSpot ranking</p><CardTitle>{scenarioComparison.comparison_summary}</CardTitle></CardHeader><CardContent>{scenarioComparison.rankings.map((item, index) => <article key={item.scenario_id} className={index === 0 ? "winner" : ""}><span>#{index + 1}</span><div><strong>{item.label}</strong><p>{item.key_tradeoff}</p></div><strong>{item.overall_score.toFixed(0)}</strong></article>)}</CardContent></Card> : <Card className="plain-card comparison-placeholder"><GitCompare /><h3>Your ranking will appear here.</h3><p>Save at least one spot and choose “Rank saved spots.”</p></Card>}
                 </div>
               </div>
             )}
 
-            {activeTab === "evidence" && (
-              <div className="space-y-5">
-                <div className="content-heading"><div><p className="eyebrow">Transparency behind the answer</p><h2>Understand the data and tune the setup.</h2><p>Advanced controls live here, away from the main decision flow but available whenever you need them.</p></div></div>
-                <div className="data-setup-grid">
-                  <BusinessResolverPanel municipalityName={municipalityName} radiusKm={radius[0]} currentCatalogBusinessSubcategory={businessSubcategory} businessInputMode={businessInputMode} onBusinessInputModeChange={setBusinessInputMode} customBusinessQuery={customBusinessQuery} onCustomBusinessQueryChange={setCustomBusinessQuery} useCustomBusinessForMap={useCustomBusinessForMap} onUseCustomBusinessForMapChange={setUseCustomBusinessForMap} onBusinessResolutionChange={setBusinessResolution} className="plain-card" />
-                  <ScenarioSupportPanel municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} businessInputMode={businessInputMode} customBusinessQuery={customBusinessQuery} useCustomBusinessForMap={useCustomBusinessForMap} businessResolution={businessResolution} />
-                </div>
-                <Card className="plain-card trust-card"><CardHeader><div><p className="eyebrow">Evidence confidence</p><CardTitle>What is observed and what is estimated</CardTitle></div><Badge variant="outline" className={credibilityClass(credibility?.confidence_level)}>{credibility?.overall_confidence_score?.toFixed(0) ?? "—"}/100 · {credibility?.confidence_level || "Unknown"}</Badge></CardHeader><CardContent className="trust-columns"><div><h3><Database />Observed inputs</h3>{(credibility?.observed_inputs ?? []).slice(0, 5).map((item) => <article key={item.field_name}><strong>{item.label}</strong><p>{item.user_note}</p></article>)}</div><div><h3><BrainCircuit />Estimated or modelled</h3>{(credibility?.proxy_estimated_inputs ?? []).slice(0, 5).map((item) => <article key={item.field_name}><strong>{item.label}</strong><p>{item.user_note}</p></article>)}</div></CardContent></Card>
-                <div className="system-grid"><Card className="plain-card"><CardHeader><CardTitle>System check</CardTitle><p>Verify the services behind this workspace.</p></CardHeader><CardContent><Button variant="outline" className="rounded-full" onClick={handleRunValidation} disabled={isValidating}>{isValidating ? "Checking…" : "Run system check"}</Button>{systemValidation && <div className="validation-list">{systemValidation.checks.map((check) => <p key={check.name} className={check.status === "passed" ? "pass" : "fail"}>{check.status === "passed" ? "PASS" : "CHECK"}<span>{check.name}</span></p>)}</div>}</CardContent></Card><Card className="plain-card"><CardHeader><CardTitle>Prediction model</CardTitle><p>Health and freshness of the feasibility engine.</p></CardHeader><CardContent className="model-status"><span className={modelStatus?.status === "ready" ? "ready" : ""}>{modelStatus?.status || "Unavailable"}</span><p>{modelStatus?.important_note || "Model status details are not available."}</p></CardContent></Card></div>
-              </div>
-            )}
           </motion.section>
         </AnimatePresence>
       </main>

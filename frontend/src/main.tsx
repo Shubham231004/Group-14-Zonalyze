@@ -18,8 +18,22 @@ if (clerkKey) {
     <ClerkProvider
       publishableKey={clerkKey}
       appearance={{
+        layout: {
+          logoImageUrl: "/branding/bestspot-logo.png",
+        },
+        elements: {
+          logoImage: {
+            mixBlendMode: "multiply",
+          },
+        },
         variables: {
           colorPrimary: "#d63a2c",
+          colorBackground: "#fdfcfb",
+          colorForeground: "#261f1d",
+          colorInput: "#f4efe8",
+          colorInputForeground: "#261f1d",
+          colorBorder: "#e5ddd2",
+          colorModalBackdrop: "rgba(244, 239, 232, 0.88)",
           fontFamily: '"Public Sans", system-ui, sans-serif',
           borderRadius: "0.75rem",
         },

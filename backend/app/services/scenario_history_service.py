@@ -167,6 +167,23 @@ def clear_saved_scenarios(db: Session, user_id: str | None = None) -> ScenarioHi
     return ScenarioHistoryResponse(count=0, scenarios=[])
 
 
+def delete_saved_scenario(
+    scenario_id: str, db: Session, user_id: str | None = None
+) -> ScenarioHistoryResponse:
+    record = (
+        db.query(ScenarioHistoryRecord)
+        .filter(
+            ScenarioHistoryRecord.scenario_id == scenario_id,
+            ScenarioHistoryRecord.user_id == user_id,
+        )
+        .first()
+    )
+    if record is not None:
+        db.delete(record)
+        db.commit()
+    return list_saved_scenarios(db, user_id=user_id)
+
+
 def _risk_points(risk_class: str | None) -> float:
     if risk_class == "low":
         return 92.0

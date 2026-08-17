@@ -48,14 +48,18 @@ CLERK_ISSUER = os.getenv("CLERK_ISSUER", "").strip().rstrip("/")
 CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL", "").strip() or (
     f"{CLERK_ISSUER}/.well-known/jwks.json" if CLERK_ISSUER else ""
 )
-AUTH_ENABLED = bool(CLERK_ISSUER and CLERK_JWKS_URL)
+CLERK_JWT_KEY = os.getenv("CLERK_JWT_KEY", "").strip().replace("\\n", "\n")
+AUTH_ENABLED = bool(CLERK_ISSUER and (CLERK_JWT_KEY or CLERK_JWKS_URL))
 
 # --- CORS ---
 # Comma-separated allowlist of browser origins permitted to call the API.
-# Defaults to the local Vite dev server so behaviour is unchanged in dev.
+# Defaults to both names used for the local Vite dev server.
 CORS_ALLOW_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173").split(",")
+    for origin in os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
     if origin.strip()
 ]
 

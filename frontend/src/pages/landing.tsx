@@ -15,17 +15,7 @@ import {
   Store,
   Users,
 } from "lucide-react";
-
-function BrandLockup({ compact = false }: { compact?: boolean }) {
-  return (
-    <a href="#top" className="group inline-flex items-center gap-2.5" aria-label="BestSpot home">
-      <span className={`brand-pin ${compact ? "text-2xl" : "text-3xl"}`} aria-hidden />
-      <span className="font-display text-xl font-semibold tracking-tight">
-        BestSpot<span className="font-sans text-[11px] font-semibold text-primary">.biz</span>
-      </span>
-    </a>
-  );
-}
+import BrandLogo from "@/components/BrandLogo";
 
 function ProductMapPreview() {
   const competitors = [
@@ -76,7 +66,7 @@ export default function Landing() {
   return (
     <div id="top" className="min-h-screen bg-background text-foreground">
       <header className="landing-nav">
-        <BrandLockup compact />
+        <BrandLogo href="#top" size="compact" />
         <nav className="hidden items-center gap-7 md:flex" aria-label="Main navigation">
           <a href="#answers" className="nav-link">What you learn</a><a href="#how-it-works" className="nav-link">How it works</a><a href="#compare" className="nav-link">Compare spots</a>
         </nav>
@@ -115,9 +105,9 @@ export default function Landing() {
           </div>
         </section>
         <section className="assistant-strip"><div className="page-shell assistant-strip-inner"><div className="assistant-icon"><Bot className="h-6 w-6" /></div><div><p className="eyebrow">Questions do not stop after the score</p><h2>Ask BestSpot anything about your result.</h2></div><p>“Why is the competition score high?” “What happens at a 3 km radius?” Your assistant answers from the active location and its evidence.</p></div></section>
-        <section id="signin" className="page-shell sign-in-section"><div className="sign-in-copy"><BrandLockup /><p className="eyebrow mt-10">Your next location deserves a real answer</p><h2>Start with one spot.</h2><p>Sign in to keep your searches private, save promising locations, and compare them when you are ready.</p><div className="sign-in-trust"><ShieldCheck className="h-5 w-5" /><span>Secure sign-in. We never ask for banking or lease documents.</span></div></div><div className="sign-in-card"><SignIn routing="hash" /></div></section>
+        <section id="signin" className="page-shell sign-in-section"><div className="sign-in-copy"><BrandLogo href="#top" size="large" /><p className="eyebrow mt-10">Your next location deserves a real answer</p><h2>Start with one spot.</h2><p>Sign in to keep your searches private, save promising locations, and compare them when you are ready.</p><div className="sign-in-trust"><ShieldCheck className="h-5 w-5" /><span>Secure sign-in. We never ask for banking or lease documents.</span></div></div><div className="sign-in-card"><SignIn routing="hash" /></div></section>
       </main>
-      <footer className="site-footer"><div className="page-shell site-footer-inner"><BrandLockup compact /><p>Competition, cost, and location clarity for your next Ontario business.</p><span>bestspot.biz</span></div></footer>
+      <footer className="site-footer"><div className="page-shell site-footer-inner"><BrandLogo href="#top" size="compact" /><p>Competition, cost, and location clarity for your next Ontario business.</p><span>bestspot.biz</span></div></footer>
     </div>
   );
 }
