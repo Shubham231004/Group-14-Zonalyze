@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
+import SiteFooter from "@/components/SiteFooter";
 
 function ProductMapPreview() {
   const competitors = [
@@ -107,7 +108,7 @@ export default function Landing() {
         <section className="assistant-strip"><div className="page-shell assistant-strip-inner"><div className="assistant-icon"><Bot className="h-6 w-6" /></div><div><p className="eyebrow">Questions do not stop after the score</p><h2>Ask BestSpot anything about your result.</h2></div><p>“Why is the competition score high?” “What happens at a 3 km radius?” Your assistant answers from the active location and its evidence.</p></div></section>
         <section id="signin" className="page-shell sign-in-section"><div className="sign-in-copy"><BrandLogo href="#top" size="large" /><p className="eyebrow mt-10">Your next location deserves a real answer</p><h2>Start with one spot.</h2><p>Sign in to keep your searches private, save promising locations, and compare them when you are ready.</p><div className="sign-in-trust"><ShieldCheck className="h-5 w-5" /><span>Secure sign-in. We never ask for banking or lease documents.</span></div></div><div className="sign-in-card"><SignIn routing="hash" /></div></section>
       </main>
-      <footer className="site-footer"><div className="page-shell site-footer-inner"><BrandLogo href="#top" size="compact" /><p>Competition, cost, and location clarity for your next Ontario business.</p><span>bestspot.biz</span></div></footer>
+      <SiteFooter />
     </div>
   );
 }

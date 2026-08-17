@@ -37,8 +37,29 @@ function confidenceClass(confidence: string) {
   const normalized = confidence.toLowerCase();
   if (normalized.includes("high")) return "border-emerald-400/50 bg-emerald-500/10 text-emerald-700";
   if (normalized.includes("moderate")) return "border-amber-400/50 bg-amber-500/10 text-amber-700";
-  if (normalized.includes("limited")) return "border-sky-400/50 bg-sky-500/10 text-sky-100";
-  return "border-slate-500/50 bg-slate-500/10 text-foreground";
+  if (normalized.includes("limited")) return "border-sky-500 bg-sky-100 text-sky-900";
+  return "border-slate-500 bg-slate-100 text-slate-800";
+}
+
+const confidenceLabels: Record<string, string> = {
+  high: "High",
+  moderate: "Moderate",
+  limited: "Limited",
+  low: "Low",
+  unavailable: "Unavailable",
+};
+
+const sourceMethodLabels: Record<string, string> = {
+  local_ai_benchmark_operating_profile_with_available_context: "AI estimate",
+  local_ai_unavailable_no_static_formula_fallback: "Unavailable",
+};
+
+function confidenceLabel(value: string) {
+  return confidenceLabels[value.trim().toLowerCase()] ?? "Estimated";
+}
+
+function sourceMethodLabel(value: string) {
+  return sourceMethodLabels[value.trim().toLowerCase()] ?? "Estimate";
 }
 
 export default function OperatingProfilePanel({
@@ -169,13 +190,10 @@ export default function OperatingProfilePanel({
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${confidenceClass(profile.overall_confidence)}`}>
-                {profile.overall_confidence} confidence
+                {confidenceLabel(profile.overall_confidence)}
               </span>
               <span className="rounded-full border border-slate-600 bg-muted px-3 py-1 text-xs text-foreground">
-                {profile.cache_status}
-              </span>
-              <span className="rounded-full border border-slate-600 bg-muted px-3 py-1 text-xs text-foreground">
-                {profile.source_method}
+                {sourceMethodLabel(profile.source_method)}
               </span>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">{profile.user_facing_note}</p>
@@ -190,7 +208,7 @@ export default function OperatingProfilePanel({
                     <p className="mt-1 text-sm text-primary">{formatRange(section)}</p>
                   </div>
                   <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${confidenceClass(section.confidence)}`}>
-                    {section.confidence}
+                    {confidenceLabel(section.confidence)}
                   </span>
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">{section.summary}</p>

@@ -220,9 +220,6 @@ function footfallHeatmapGeoJson(geoContext: GeospatialMarketContext) {
 
 function FootfallLegend({ geoContext }: { geoContext: GeospatialMarketContext }) {
   const points = normalizeFootfallPoints(geoContext);
-  const status = geoContext.footfall_heatmap_status || (points.length ? "observed_counter_data" : "not_available");
-  const sources = geoContext.footfall_heatmap_sources ?? [];
-  const periods = [...new Set(points.map((point) => point.observationPeriod))];
   const counts = points.map((point) => point.observedCount);
   const countRange = counts.length
     ? `${Math.round(Math.min(...counts)).toLocaleString()}–${Math.round(Math.max(...counts)).toLocaleString()} avg/day`
@@ -248,15 +245,10 @@ function FootfallLegend({ geoContext }: { geoContext: GeospatialMarketContext })
       </div>
 
       <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-        {geoContext.footfall_heatmap_note || "No observed pedestrian counter data was returned for this scenario."}
+        {countRange
+          ? `Heat interpolates an observed range of ${countRange}.`
+          : "No observed municipal counter data is available."}
       </p>
-
-      {countRange ? <p className="mt-1 text-[9px] font-mono text-foreground">Observed range: {countRange}</p> : null}
-      {periods.length ? <p className="mt-1 text-[9px] leading-snug text-muted-foreground">Period: {periods.join(" · ")}</p> : null}
-      {sources.length ? (
-        <p className="mt-1 text-[9px] leading-snug text-muted-foreground">Sources: {sources.join(", ")}</p>
-      ) : null}
-      <p className="mt-1 text-[9px] text-muted-foreground">Status: {String(status).replaceAll("_", " ")}</p>
     </div>
   );
 }
