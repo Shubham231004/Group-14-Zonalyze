@@ -257,6 +257,21 @@ export interface HeatmapCell {
   source_method: string;
 }
 
+export interface FootfallHeatmapPoint {
+  point_id: string;
+  latitude: number;
+  longitude: number;
+  intensity: number;
+  evidence_type: "observed_pedestrian_count" | string;
+  source: string;
+  label?: string | null;
+  category?: string | null;
+  observed_count: number;
+  observed_unit: string;
+  observation_period: string;
+  source_url?: string | null;
+}
+
 export interface GeospatialMarketContext {
   municipality_name: string;
   business_subcategory: string;
@@ -289,6 +304,10 @@ export interface GeospatialMarketContext {
   lease_marker_count: number;
   markers: MapMarker[];
   heatmap_cells: HeatmapCell[];
+  footfall_heatmap_points?: FootfallHeatmapPoint[];
+  footfall_heatmap_status?: string;
+  footfall_heatmap_note?: string;
+  footfall_heatmap_sources?: string[];
   osm_query_status: string;
   osm_query_note: string;
   next_data_needed: string[];
@@ -360,10 +379,9 @@ export interface ScenarioSupportResponse {
   allowed_next_actions: string[];
 }
 
-export interface FeasibilityReportResponse {
+export interface FeasibilityReportDownload {
   filename: string;
-  content_type: string;
-  report_text: string;
+  blob: Blob;
 }
 
 export interface ScenarioHistoryItem {
@@ -588,17 +606,21 @@ export function analyzeScenario(
   });
 }
 
-export function generateFeasibilityReport(
+export async function generateFeasibilityReport(
   request: AnalyzeScenarioRequest,
-): Promise<FeasibilityReportResponse> {
-  return requestJson<FeasibilityReportResponse>(
-    `${API_BASE}/reports/feasibility`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    },
-  );
+): Promise<FeasibilityReportDownload> {
+  const response = await fetch(`${API_BASE}/reports/feasibility`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText} — ${await response.text()}`);
+  }
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+    ?? "bestspot-location-report.pdf";
+  return { filename, blob: await response.blob() };
 }
 
 
@@ -638,6 +660,13 @@ export function clearScenarioHistory(): Promise<ScenarioHistoryResponse> {
   return requestJson<ScenarioHistoryResponse>(`${API_BASE}/scenario-history`, {
     method: "DELETE",
   });
+}
+
+export function deleteScenarioFromHistory(scenarioId: string): Promise<ScenarioHistoryResponse> {
+  return requestJson<ScenarioHistoryResponse>(
+    `${API_BASE}/scenario-history/${encodeURIComponent(scenarioId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function compareScenarioHistory(): Promise<ScenarioComparisonResponse> {

@@ -46,8 +46,6 @@ const SUGGESTED_QUESTIONS = [
   "Why is this scenario recommended or not recommended?",
   "What is the biggest risk in this scenario?",
   "What can I change to improve feasibility?",
-  "Which values are real data and which are estimated?",
-  "How reliable is this prediction?",
 ];
 
 function normalizeSignals(response: ScenarioChatResponse | null): string[] {
@@ -230,19 +228,19 @@ export default function ScenarioAIChat({
             </ul>
           </div>
         )}
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <div className="divide-y divide-border border-y border-border">
           {SUGGESTED_QUESTIONS.map((item) => (
             <Button
               key={item}
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="justify-start border-border bg-white/[0.03] text-left text-[11px] text-muted-foreground hover:bg-primary/10"
+              className="h-auto min-h-12 w-full justify-start rounded-none px-2 py-3 text-left text-xs leading-5 text-muted-foreground hover:bg-primary/5 hover:text-foreground"
               onClick={() => askQuestion(item)}
               disabled={isAsking}
             >
               <Sparkles className="mr-2 h-3.5 w-3.5 shrink-0 text-primary" />
-              <span className="truncate">{item}</span>
+              <span>{item}</span>
             </Button>
           ))}
         </div>

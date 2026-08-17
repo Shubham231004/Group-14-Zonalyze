@@ -2,3 +2,5 @@
 # Install with:  pip install -r requirements-dev.txt
 pytest
 httpx        # required by fastapi/starlette TestClient used in tests/
+pypdf==6.16.1
+pdfplumber==0.11.10

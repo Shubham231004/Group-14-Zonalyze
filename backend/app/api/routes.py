@@ -2,7 +2,7 @@ import logging
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from app.core.auth import require_user
 from sqlalchemy.orm import Session
@@ -11,7 +11,6 @@ from app.db.test_connection import test_database_connection
 from app.db.dependencies import get_db
 from app.schemas.bus import RegisteredSensorsResponse, PacketHistoryResponse
 from app.schemas.dashboard import DashboardSummaryResponse
-from app.schemas.report import FeasibilityReportResponse
 from app.schemas.scenario import AnalyzeScenarioRequest
 from app.schemas.validation import SystemValidationResponse
 from app.schemas.model_status import ModelStatusResponse
@@ -60,6 +59,7 @@ from app.services.recommendation_service import build_recommendation_decision
 from app.services.scenario_history_service import (
     clear_saved_scenarios,
     compare_saved_scenarios,
+    delete_saved_scenario,
     list_saved_scenarios,
     save_dashboard_to_history,
 )
@@ -130,13 +130,18 @@ def analyze_scenario_route(
     return analyze_scenario(request=request, db=db)
 
 
-@router.post("/reports/feasibility", response_model=FeasibilityReportResponse)
+@router.post("/reports/feasibility")
 def feasibility_report_route(
     request: AnalyzeScenarioRequest,
     db: Session = Depends(get_db),
 ):
     dashboard = analyze_scenario(request=request, db=db)
-    return build_feasibility_report(dashboard)
+    filename, pdf = build_feasibility_report(dashboard)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 
@@ -426,6 +431,15 @@ def clear_scenario_history_route(
     user: Optional[dict[str, Any]] = Depends(require_user),
 ):
     return clear_saved_scenarios(db, user_id=_user_id(user))
+
+
+@router.delete("/scenario-history/{scenario_id}", response_model=ScenarioHistoryResponse)
+def delete_scenario_history_route(
+    scenario_id: str,
+    db: Session = Depends(get_db),
+    user: Optional[dict[str, Any]] = Depends(require_user),
+):
+    return delete_saved_scenario(scenario_id, db, user_id=_user_id(user))
 
 
 @router.post("/scenario-history/compare", response_model=ScenarioComparisonResponse)

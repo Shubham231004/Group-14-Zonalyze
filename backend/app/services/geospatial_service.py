@@ -30,7 +30,6 @@ from app.services.osm_service import (
     fetch_osm_competitors,
     fetch_osm_pois_by_resolved_tags,
     fetch_osm_transit,
-    fetch_osm_commercial_activity,
 )
 from app.services.mapbox_geocoding_service import enrich_missing_addresses
 from app.schemas.business_resolver import BusinessResolveRequest
@@ -458,12 +457,12 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
             limit=60,
         )
 
-    # The three OSM queries are independent network calls. Running them in parallel
+    # The two OSM queries are independent network calls. Running them in parallel
     # bounds the market-map latency to the slowest single query instead of the sum
-    # of all three — the difference between a map that renders and one that trips
+    # of both — the difference between a map that renders and one that trips
     # the frontend's request timeout when a mirror is slow. (Overpass mirror
     # failover already lives in osm_service._fetch_overpass.)
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=2) as pool:
         competitor_future = pool.submit(_fetch_competitors)
         transit_future = pool.submit(
             fetch_osm_transit,
@@ -472,16 +471,8 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
             radius_km=radius_km,
             limit=30,
         )
-        commercial_future = pool.submit(
-            fetch_osm_commercial_activity,
-            center_lat=center_lat,
-            center_lon=center_lng,
-            radius_km=radius_km,
-            limit=50,
-        )
         competitor_result = competitor_future.result()
         transit_result = transit_future.result()
-        commercial_activity_result = commercial_future.result()
 
     competitor_pois = enrich_missing_addresses(
         competitor_result.elements,
@@ -512,7 +503,7 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
 
     markers: List[MapMarker] = []
 
-    for index, poi in enumerate(competitor_pois[:35], start=1):
+    for index, poi in enumerate(competitor_pois, start=1):
         x_pct, y_pct = _xy_offsets_from_coordinate(center_lat, center_lng, poi["latitude"], poi["longitude"], radius_km)
         markers.append(
             MapMarker(
@@ -564,23 +555,22 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
         )
 
     footfall_heatmap_points = build_footfall_heatmap_points(
-        competitor_pois=competitor_pois,
-        transit_pois=transit_result.elements,
-        commercial_activity_pois=commercial_activity_result.elements,
-        limit=180,
+        center_lat=center_lat,
+        center_lng=center_lng,
+        radius_km=radius_km,
     )
     if footfall_heatmap_points:
-        footfall_heatmap_status = "available"
+        footfall_heatmap_status = "observed_counter_data"
         footfall_heatmap_note = (
-            "Footfall evidence heatmap is based on real public OpenStreetMap evidence points: "
-            "business/competitor POIs, transit access points, and commercial activity POIs. "
-            "It is a footfall-potential evidence layer, not live pedestrian count data."
+            "Heat is interpolated only from published municipal pedestrian-counter measurements "
+            "inside this radius. It is observed historical evidence, not live device tracking, "
+            "and areas between counters are a visual interpolation."
         )
     else:
-        footfall_heatmap_status = "no_public_osm_evidence"
+        footfall_heatmap_status = "no_observed_counter_coverage"
         footfall_heatmap_note = (
-            "No public OSM activity points were available for a footfall evidence heatmap in this radius. "
-            "Zonalyze did not synthesize heatmap points."
+            "No published municipal pedestrian counter falls inside this radius. "
+            "Zonalyze did not substitute POI density or synthetic footfall."
         )
 
     competition_index = _safe_float(getattr(authoritative_competition, "competition_pressure_index", None), 0.0)
@@ -598,7 +588,7 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
             risk_index=risk_index,
         )
 
-    osm_statuses = {competitor_result.status, transit_result.status, commercial_activity_result.status}
+    osm_statuses = {competitor_result.status, transit_result.status}
     if "live_osm" in osm_statuses:
         osm_query_status = "live_osm_partial" if any(status != "live_osm" for status in osm_statuses) else "live_osm"
     elif "business_resolution_needs_review" in osm_statuses:
@@ -606,15 +596,16 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
     else:
         osm_query_status = "fallback_proxy"
 
-    osm_query_note = " ".join(sorted({competitor_result.note, transit_result.note, commercial_activity_result.note}))
+    osm_query_note = " ".join(sorted({competitor_result.note, transit_result.note}))
 
     evidence_note = (
         "OpenStreetMap points improve geospatial realism, but they do not guarantee complete market coverage. "
         "For free-text business ideas, competitor/POI markers come from validated OSM tags generated by the local AI business resolver. "
         "If the resolver cannot produce validated tags, Zonalyze does not invent competitor markers."
         if dynamic_resolution
-        else "OpenStreetMap points improve geospatial realism, but they do not guarantee complete market coverage. The map currently displays direct competitor, transit-access, and footfall-potential evidence layers only when real public OSM evidence is available. Competitor addresses use OpenStreetMap address tags first, with optional Mapbox reverse-geocoding fallback when a Mapbox token is configured."
+        else "OpenStreetMap points improve competitor coverage but do not measure foot traffic. Competitor addresses use OpenStreetMap address tags first, with optional Mapbox reverse-geocoding fallback when a Mapbox token is configured."
     )
+    evidence_note += " The footfall layer uses only published municipal pedestrian-counter observations."
 
     return GeospatialMarketContext(
         municipality_name=municipality_name,
@@ -655,17 +646,13 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
         footfall_heatmap_points=footfall_heatmap_points,
         footfall_heatmap_status=footfall_heatmap_status,
         footfall_heatmap_note=footfall_heatmap_note,
-        footfall_heatmap_sources=[
-            "OpenStreetMap business/competitor POIs",
-            "OpenStreetMap transit/access POIs",
-            "OpenStreetMap commercial activity POIs",
-        ] if footfall_heatmap_points else [],
+        footfall_heatmap_sources=sorted({point.source for point in footfall_heatmap_points}),
         osm_query_status=osm_query_status,
         osm_query_note=osm_query_note,
         next_data_needed=[
             "Overpass result-count coverage checks for resolved OSM tags",
             "Commercial lease listing coordinates and asking rents",
-            "Observed pedestrian or mobility data for true foot-traffic intensity",
+            "Additional observed pedestrian counters for wider and more current footfall coverage",
             "Municipal business licence data for more complete competitor coverage",
             "Neighbourhood or parcel boundaries for more precise site-level coverage",
         ],

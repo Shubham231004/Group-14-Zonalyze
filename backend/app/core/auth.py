@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 from fastapi import Header, HTTPException, status
 
-from app.core.config import AUTH_ENABLED, CLERK_ISSUER, CLERK_JWKS_URL
+from app.core.config import AUTH_ENABLED, CLERK_ISSUER, CLERK_JWKS_URL, CLERK_JWT_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +62,10 @@ def require_user(authorization: Optional[str] = Header(default=None)) -> Optiona
 
     token = authorization.split(" ", 1)[1].strip()
     try:
-        signing_key = _get_jwk_client().get_signing_key_from_jwt(token)
+        signing_key = CLERK_JWT_KEY or _get_jwk_client().get_signing_key_from_jwt(token).key
         claims = jwt.decode(
             token,
-            signing_key.key,
+            signing_key,
             algorithms=["RS256"],
             issuer=CLERK_ISSUER,
             options={"verify_aud": False},

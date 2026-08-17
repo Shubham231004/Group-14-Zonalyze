@@ -512,7 +512,7 @@ def _tag_query(tags: List[Tuple[str, str]], lat: float, lon: float, radius_m: in
 
 
 def build_overpass_query(tags: List[Tuple[str, str]], lat: float, lon: float, radius_km: float, limit: int = 80) -> str:
-    radius_m = int(max(250, min(radius_km * 1000, 12000)))
+    radius_m = int(max(250, min(radius_km * 1000, 25000)))
     body = _tag_query(tags, lat, lon, radius_m)
     return f"""
 [out:json][timeout:{OVERPASS_TIMEOUT_SECONDS}];
