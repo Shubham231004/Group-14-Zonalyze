@@ -51,13 +51,17 @@ class FootfallHeatmapPoint(BaseModel):
         default=1.0,
         ge=0,
         le=1,
-        description="Relative heatmap weight. This is evidence density, not live people count.",
+        description="Relative display weight normalized from an observed pedestrian count.",
     )
     evidence_type: str
     source: str
     label: Optional[str] = None
     osm_id: Optional[str] = None
     category: Optional[str] = None
+    observed_count: float = Field(ge=0)
+    observed_unit: str
+    observation_period: str
+    source_url: Optional[str] = None
 
 
 class DynamicOSMTagContext(BaseModel):
@@ -163,7 +167,7 @@ class GeospatialMarketContext(BaseModel):
     heatmap_cells: List[HeatmapCell]
     footfall_heatmap_points: List[FootfallHeatmapPoint] = Field(default_factory=list)
     footfall_heatmap_status: str = "not_requested"
-    footfall_heatmap_note: str = "Footfall evidence heatmap was not built."
+    footfall_heatmap_note: str = "Observed pedestrian-counter heatmap was not built."
     footfall_heatmap_sources: List[str] = Field(default_factory=list)
     osm_query_status: str
     osm_query_note: str

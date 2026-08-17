@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import {
   compareScenarioLocations,
   type LocationComparisonItem,
@@ -110,9 +111,21 @@ export default function LocationComparisonPanel({
           type="button"
           onClick={runComparison}
           disabled={loading || !businessSubcategory}
-          className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+          aria-busy={loading}
+          className={`inline-flex min-w-44 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${
+            loading
+              ? "border-primary bg-primary text-primary-foreground shadow-md ring-4 ring-primary/15 disabled:cursor-wait disabled:opacity-100"
+              : "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+          }`}
         >
-          {loading ? "Comparing..." : "Compare locations"}
+          {loading ? (
+            <span className="inline-flex items-center gap-2" role="status" aria-live="polite">
+              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              Comparing locations
+            </span>
+          ) : (
+            "Compare locations"
+          )}
         </button>
       </div>
 

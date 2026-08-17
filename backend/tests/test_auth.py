@@ -1,11 +1,8 @@
-"""Tests for the Clerk auth dependency and route protection.
-
-These do not require a real Clerk instance: they verify the feature-flag
-behaviour (off by default) and that protected routes reject requests without a
-valid token when auth is enabled. Real token verification is Clerk's job.
-"""
+"""Tests for the Clerk auth dependency and route protection."""
 from __future__ import annotations
 
+from cryptography.hazmat.primitives.asymmetric import rsa
+import jwt
 import pytest
 from fastapi import HTTPException
 
@@ -13,7 +10,6 @@ from app.core import auth
 
 
 def test_disabled_auth_returns_none():
-    """When Clerk is not configured, the dependency is a no-op."""
     original = auth.AUTH_ENABLED
     auth.AUTH_ENABLED = False
     try:
@@ -25,8 +21,6 @@ def test_disabled_auth_returns_none():
 
 def test_enabled_auth_rejects_missing_and_malformed_header(monkeypatch):
     monkeypatch.setattr(auth, "AUTH_ENABLED", True)
-    # Pretend PyJWT is installed so we exercise the header checks, not the
-    # library-missing branch.
     monkeypatch.setattr(auth, "jwt", object())
     monkeypatch.setattr(auth, "PyJWKClient", object())
 
@@ -37,7 +31,6 @@ def test_enabled_auth_rejects_missing_and_malformed_header(monkeypatch):
 
 
 def test_protected_route_open_when_auth_disabled(client):
-    # Default test config has auth disabled -> protected route is reachable.
     assert auth.AUTH_ENABLED is False
     assert client.get("/bus/registered-sensors").status_code == 200
 
@@ -47,8 +40,18 @@ def test_protected_route_401_but_health_open_when_auth_enabled(client, monkeypat
     monkeypatch.setattr(auth, "jwt", object())
     monkeypatch.setattr(auth, "PyJWKClient", object())
 
-    # Protected route now requires a token.
     assert client.get("/bus/registered-sensors").status_code == 401
-    # Public endpoints remain reachable.
     assert client.get("/health").status_code == 200
     assert client.get("/").status_code == 200
+
+
+def test_require_user_accepts_configured_clerk_public_key(monkeypatch):
+    issuer = "https://example.clerk.accounts.dev"
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    token = jwt.encode({"sub": "user_123", "iss": issuer}, private_key, algorithm="RS256")
+
+    monkeypatch.setattr(auth, "AUTH_ENABLED", True)
+    monkeypatch.setattr(auth, "CLERK_ISSUER", issuer)
+    monkeypatch.setattr(auth, "CLERK_JWT_KEY", private_key.public_key())
+
+    assert auth.require_user(f"Bearer {token}")["sub"] == "user_123"

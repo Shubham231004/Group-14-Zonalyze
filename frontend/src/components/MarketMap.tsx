@@ -113,7 +113,7 @@ function normalizeMarkers(geoContext: GeospatialMarketContext): NormalizedMarker
     })
     .filter((marker): marker is NormalizedMarker => {
       if (!marker) return false;
-      return isCompetitorMarker(marker.type) || isTransitMarker(marker.type);
+      return isCompetitorMarker(marker.type);
     });
 }
 
@@ -146,30 +146,6 @@ function circlePolygon(center: [number, number], radiusKm: number, points = 96) 
   } as any;
 }
 
-function heatmapGeoJson(geoContext: GeospatialMarketContext) {
-  const cells = Array.isArray(geoContext.heatmap_cells) ? geoContext.heatmap_cells : [];
-
-  return {
-    type: "FeatureCollection",
-    features: cells
-      .filter((cell: any) => isFiniteNumber(cell.latitude) && isFiniteNumber(cell.longitude))
-      .map((cell: any, index: number) => ({
-        type: "Feature",
-        properties: {
-          id: cell.cell_id ?? `heat-${index}`,
-          label: cell.label ?? "Demand/risk cell",
-          demand: Number(cell.demand_intensity ?? 50),
-          risk: Number(cell.risk_intensity ?? 50),
-        },
-        geometry: {
-          type: "Point",
-          coordinates: [cell.longitude, cell.latitude],
-        },
-      })),
-  } as any;
-}
-
-
 type FootfallPoint = {
   id: string;
   latitude: number;
@@ -179,20 +155,23 @@ type FootfallPoint = {
   source?: string;
   label?: string | null;
   category?: string | null;
+  observedCount: number;
+  observedUnit: string;
+  observationPeriod: string;
+  sourceUrl?: string | null;
 };
 
 function normalizeFootfallPoints(geoContext: GeospatialMarketContext): FootfallPoint[] {
-  const points = Array.isArray((geoContext as any).footfall_heatmap_points)
-    ? ((geoContext as any).footfall_heatmap_points as any[])
-    : [];
+  const points = geoContext.footfall_heatmap_points ?? [];
 
   return points
-    .map((point: any, index: number): FootfallPoint | null => {
+    .map((point, index): FootfallPoint | null => {
       const latitude = Number(point.latitude);
       const longitude = Number(point.longitude);
       const rawIntensity = Number(point.intensity ?? 0);
+      const observedCount = Number(point.observed_count);
 
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(observedCount)) return null;
 
       return {
         id: String(point.point_id ?? point.id ?? `footfall-${index}`),
@@ -203,6 +182,10 @@ function normalizeFootfallPoints(geoContext: GeospatialMarketContext): FootfallP
         source: point.source,
         label: point.label,
         category: point.category,
+        observedCount,
+        observedUnit: point.observed_unit,
+        observationPeriod: point.observation_period,
+        sourceUrl: point.source_url,
       };
     })
     .filter((point): point is FootfallPoint => Boolean(point));
@@ -218,10 +201,14 @@ function footfallHeatmapGeoJson(geoContext: GeospatialMarketContext) {
       properties: {
         id: point.id,
         intensity: point.intensity,
-        label: point.label ?? "Footfall evidence point",
-        evidenceType: point.evidenceType ?? "public_activity_evidence",
-        source: point.source ?? "OpenStreetMap / public map evidence",
+        label: point.label ?? "Pedestrian counter",
+        evidenceType: point.evidenceType ?? "observed_pedestrian_count",
+        source: point.source ?? "Municipal pedestrian counter",
         category: point.category ?? null,
+        observedCount: point.observedCount,
+        observedUnit: point.observedUnit,
+        observationPeriod: point.observationPeriod,
+        sourceUrl: point.sourceUrl ?? null,
       },
       geometry: {
         type: "Point",
@@ -231,56 +218,43 @@ function footfallHeatmapGeoJson(geoContext: GeospatialMarketContext) {
   } as any;
 }
 
-function footfallColor(intensity: number): string {
-  // Soft, map-friendly palette: teal → warm amber → soft coral.
-  // Avoids harsh red blobs while still showing relative footfall potential.
-  if (intensity >= 0.78) return "#fb7185";
-  if (intensity >= 0.58) return "#fbbf24";
-  if (intensity >= 0.35) return "#fde68a";
-  return "#5eead4";
-}
-
 function FootfallLegend({ geoContext }: { geoContext: GeospatialMarketContext }) {
   const points = normalizeFootfallPoints(geoContext);
-  const status = (geoContext as any).footfall_heatmap_status || (points.length ? "available" : "not_available");
-  const sources = Array.isArray((geoContext as any).footfall_heatmap_sources)
-    ? ((geoContext as any).footfall_heatmap_sources as string[])
-    : [];
+  const status = geoContext.footfall_heatmap_status || (points.length ? "observed_counter_data" : "not_available");
+  const sources = geoContext.footfall_heatmap_sources ?? [];
+  const periods = [...new Set(points.map((point) => point.observationPeriod))];
+  const counts = points.map((point) => point.observedCount);
+  const countRange = counts.length
+    ? `${Math.round(Math.min(...counts)).toLocaleString()}–${Math.round(Math.max(...counts)).toLocaleString()} avg/day`
+    : null;
 
   return (
-    <div className="pointer-events-none absolute bottom-4 right-4 z-[5] w-[245px] rounded-xl border border-border bg-card p-3 shadow-xl backdrop-blur-md">
+    <div className="pointer-events-none absolute bottom-4 right-4 z-[500] w-[290px] rounded-xl border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-foreground">Footfall evidence</p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">Public activity-signal density</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-foreground">Observed foot traffic</p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">Municipal pedestrian counters</p>
         </div>
         <span className="rounded-full border border-border px-2 py-0.5 text-[9px] font-mono uppercase text-muted-foreground">
-          {points.length} pts
+          {points.length} site{points.length === 1 ? "" : "s"}
         </span>
       </div>
 
-      <div className="mt-3 h-3 rounded-full border border-border bg-[linear-gradient(90deg,#5eead4_0%,#fde68a_42%,#fbbf24_70%,#fb7185_100%)] shadow-[0_0_12px_rgba(251,191,36,.18)]" />
+      <div className="mt-3 h-3 rounded-full border border-border bg-[linear-gradient(90deg,#2563eb_0%,#22c55e_38%,#fde047_68%,#ef4444_100%)] shadow-[0_0_12px_rgba(239,68,68,.18)]" />
       <div className="mt-1 flex justify-between text-[9px] font-mono uppercase text-muted-foreground">
         <span>Lower</span>
         <span>Medium</span>
         <span>Higher</span>
       </div>
 
-      <div className="mt-2 grid grid-cols-4 gap-1 text-[9px] font-mono uppercase text-muted-foreground">
-        <span className="rounded bg-teal-300/18 px-1.5 py-1 text-center text-teal-700">Low</span>
-        <span className="rounded bg-amber-100/18 px-1.5 py-1 text-center text-amber-800">Med</span>
-        <span className="rounded bg-amber-400/18 px-1.5 py-1 text-center text-amber-700">High</span>
-        <span className="rounded bg-rose-300/18 px-1.5 py-1 text-center text-rose-700">Peak</span>
-      </div>
-
       <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-        {points.length
-          ? "Heat is generated from real public map evidence such as business POIs, transit points, and commercial activity clusters."
-          : "No footfall evidence points were returned for this scenario."}
+        {geoContext.footfall_heatmap_note || "No observed pedestrian counter data was returned for this scenario."}
       </p>
 
+      {countRange ? <p className="mt-1 text-[9px] font-mono text-foreground">Observed range: {countRange}</p> : null}
+      {periods.length ? <p className="mt-1 text-[9px] leading-snug text-muted-foreground">Period: {periods.join(" · ")}</p> : null}
       {sources.length ? (
-        <p className="mt-1 truncate text-[9px] text-muted-foreground">Sources: {sources.slice(0, 3).join(", ")}</p>
+        <p className="mt-1 text-[9px] leading-snug text-muted-foreground">Sources: {sources.join(", ")}</p>
       ) : null}
       <p className="mt-1 text-[9px] text-muted-foreground">Status: {String(status).replaceAll("_", " ")}</p>
     </div>
@@ -450,6 +424,82 @@ function FitLeafletToRadius({ center, radiusKm }: { center: [number, number]; ra
   return null;
 }
 
+function LeafletFootfallHeatmap({ points }: { points: FootfallPoint[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const canvas = document.createElement("canvas");
+    canvas.className = "leaflet-footfall-heatmap";
+    Object.assign(canvas.style, {
+      position: "absolute",
+      inset: "0",
+      pointerEvents: "none",
+      zIndex: "350",
+    });
+    map.getContainer().appendChild(canvas);
+
+    const palette = document.createElement("canvas");
+    palette.width = 256;
+    palette.height = 1;
+    const paletteContext = palette.getContext("2d");
+    const paletteGradient = paletteContext?.createLinearGradient(0, 0, 256, 0);
+    paletteGradient?.addColorStop(0, "rgba(37,99,235,0)");
+    paletteGradient?.addColorStop(0.16, "#2563eb");
+    paletteGradient?.addColorStop(0.38, "#22c55e");
+    paletteGradient?.addColorStop(0.62, "#fde047");
+    paletteGradient?.addColorStop(0.82, "#f97316");
+    paletteGradient?.addColorStop(1, "#ef4444");
+    if (paletteContext && paletteGradient) {
+      paletteContext.fillStyle = paletteGradient;
+      paletteContext.fillRect(0, 0, 256, 1);
+    }
+    const palettePixels = paletteContext?.getImageData(0, 0, 256, 1).data;
+
+    const draw = () => {
+      const size = map.getSize();
+      canvas.width = size.x;
+      canvas.height = size.y;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context || !palettePixels || !points.length) return;
+
+      const radius = Math.max(42, Math.min(105, 42 + (map.getZoom() - 10) * 16));
+      for (const point of points) {
+        const pixel = map.latLngToContainerPoint([point.latitude, point.longitude]);
+        const gradient = context.createRadialGradient(pixel.x, pixel.y, 0, pixel.x, pixel.y, radius);
+        gradient.addColorStop(0, `rgba(0,0,0,${0.34 + point.intensity * 0.36})`);
+        gradient.addColorStop(0.45, `rgba(0,0,0,${0.2 + point.intensity * 0.2})`);
+        gradient.addColorStop(1, "rgba(0,0,0,0)");
+        context.fillStyle = gradient;
+        context.fillRect(pixel.x - radius, pixel.y - radius, radius * 2, radius * 2);
+      }
+
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      for (let index = 0; index < image.data.length; index += 4) {
+        const density = image.data[index + 3];
+        if (density < 8) {
+          image.data[index + 3] = 0;
+          continue;
+        }
+        const paletteIndex = Math.min(255, density) * 4;
+        image.data[index] = palettePixels[paletteIndex];
+        image.data[index + 1] = palettePixels[paletteIndex + 1];
+        image.data[index + 2] = palettePixels[paletteIndex + 2];
+        image.data[index + 3] = Math.min(205, Math.round(density * 1.25));
+      }
+      context.putImageData(image, 0, 0);
+    };
+
+    draw();
+    map.on("moveend zoomend resize", draw);
+    return () => {
+      map.off("moveend zoomend resize", draw);
+      canvas.remove();
+    };
+  }, [map, points]);
+
+  return null;
+}
+
 function MapHeader({ geoContext, radiusKm, mode }: { geoContext: GeospatialMarketContext; radiusKm: number; mode: "mapbox" | "openstreetmap" }) {
   return (
     <div className="flex flex-col gap-2 border-b border-border px-5 py-4 md:flex-row md:items-center md:justify-between">
@@ -549,32 +599,6 @@ function MapboxRenderer({ geoContext, center, radiusKm, markers }: { geoContext:
         },
       });
 
-      map.addSource("heatmap-cells", {
-        type: "geojson",
-        data: heatmapGeoJson(geoContext),
-      });
-
-      map.addLayer({
-        id: "heatmap-cells-layer",
-        type: "circle",
-        source: "heatmap-cells",
-        paint: {
-          "circle-radius": 18,
-          "circle-color": [
-            "case",
-            [">", ["get", "risk"], 70],
-            "#d93025",
-            [">", ["get", "demand"], 65],
-            "#188038",
-            "#f9ab00",
-          ],
-          "circle-opacity": 0.14,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 1,
-          "circle-stroke-opacity": 0.25,
-        },
-      });
-
       map.addSource("footfall-evidence-heatmap", {
         type: "geojson",
         data: footfallHeatmapGeoJson(geoContext),
@@ -584,68 +608,44 @@ function MapboxRenderer({ geoContext, center, radiusKm, markers }: { geoContext:
         id: "footfall-evidence-heatmap-layer",
         type: "heatmap",
         source: "footfall-evidence-heatmap",
-        maxzoom: 16,
+        maxzoom: 18,
         paint: {
           "heatmap-weight": [
             "interpolate",
             ["linear"],
             ["get", "intensity"],
             0,
-            0.18,
+            0.12,
             0.35,
             0.42,
             0.7,
             0.75,
             1,
-            0.95,
+            1,
           ],
-          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 0.72, 13, 1.05, 15, 1.35],
-          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 18, 12, 34, 14, 54, 16, 74],
-          "heatmap-opacity": 0.48,
+          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 0.85, 13, 1.25, 16, 1.55],
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 34, 12, 58, 14, 88, 16, 118],
+          "heatmap-opacity": 0.68,
           "heatmap-color": [
             "interpolate",
             ["linear"],
             ["heatmap-density"],
             0,
-            "rgba(94,234,212,0)",
-            0.22,
-            "rgba(94,234,212,0.32)",
-            0.46,
-            "rgba(253,230,138,0.46)",
-            0.7,
-            "rgba(251,191,36,0.52)",
-            1,
-            "rgba(251,113,133,0.58)",
-          ],
-        },
-      });
-
-      map.addLayer({
-        id: "footfall-evidence-point-glow",
-        type: "circle",
-        source: "footfall-evidence-heatmap",
-        minzoom: 10,
-        paint: {
-          "circle-radius": ["interpolate", ["linear"], ["get", "intensity"], 0, 5, 0.5, 8, 1, 12],
-          "circle-color": [
-            "interpolate",
-            ["linear"],
-            ["get", "intensity"],
-            0,
-            "#5eead4",
+            "rgba(37,99,235,0)",
+            0.16,
+            "rgba(37,99,235,0.38)",
             0.38,
-            "#fde68a",
-            0.65,
-            "#fbbf24",
+            "rgba(34,197,94,0.52)",
+            0.62,
+            "rgba(253,224,71,0.65)",
+            0.82,
+            "rgba(249,115,22,0.72)",
             1,
-            "#fb7185",
+            "rgba(239,68,68,0.78)",
           ],
-          "circle-opacity": 0.28,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 0.6,
-          "circle-stroke-opacity": 0.38,
         },
       });
+      map.moveLayer("analysis-radius-line");
 
       fitMapboxToRadius(map, center, radiusKm);
     });
@@ -673,11 +673,6 @@ function MapboxRenderer({ geoContext, center, radiusKm, markers }: { geoContext:
       const radiusSource = map.getSource("analysis-radius") as mapboxgl.GeoJSONSource | undefined;
       if (radiusSource) {
         radiusSource.setData(circlePolygon(center, radiusKm));
-      }
-
-      const heatmapSource = map.getSource("heatmap-cells") as mapboxgl.GeoJSONSource | undefined;
-      if (heatmapSource) {
-        heatmapSource.setData(heatmapGeoJson(geoContext));
       }
 
       const footfallSource = map.getSource("footfall-evidence-heatmap") as mapboxgl.GeoJSONSource | undefined;
@@ -751,6 +746,7 @@ function LeafletRenderer({ geoContext, center, radiusKm, markers }: { geoContext
         />
 
         <FitLeafletToRadius center={center} radiusKm={radiusKm} />
+        <LeafletFootfallHeatmap points={footfallPoints} />
 
         <Circle
           center={center}
@@ -763,31 +759,6 @@ function LeafletRenderer({ geoContext, center, radiusKm, markers }: { geoContext
             fillOpacity: 0.13,
           }}
         />
-
-        {footfallPoints.map((point) => (
-          <Circle
-            key={point.id}
-            center={[point.latitude, point.longitude]}
-            radius={75 + point.intensity * 190}
-            pathOptions={{
-              color: footfallColor(point.intensity),
-              weight: 1,
-              opacity: 0.46,
-              fillColor: footfallColor(point.intensity),
-              fillOpacity: 0.16 + point.intensity * 0.16,
-            }}
-          >
-            <Popup>
-              <div style={{ minWidth: 200, lineHeight: 1.5 }}>
-                <strong>{point.label || "Footfall evidence"}</strong>
-                <br />
-                Intensity: {Math.round(point.intensity * 100)}%
-                <br />
-                Source: {point.source || "OpenStreetMap / public map evidence"}
-              </div>
-            </Popup>
-          </Circle>
-        ))}
 
         <Marker position={center} icon={createLeafletPinIcon("#d93025", 44)} />
 

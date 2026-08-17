@@ -223,12 +223,12 @@ def run_system_validation(db: Session) -> SystemValidationResponse:
         if source_dashboard is None:
             raise ValueError("No dashboard response available for report validation.")
 
-        report = build_feasibility_report(source_dashboard)
+        report_filename, report_pdf = build_feasibility_report(source_dashboard)
         checks.append(
             _check(
                 "Feasibility report generation",
-                bool(report.filename) and "ZONALYZE FEASIBILITY REPORT" in report.report_text,
-                "Feasibility report service generated a downloadable report payload.",
+                report_filename.endswith(".pdf") and report_pdf.startswith(b"%PDF"),
+                "Feasibility report service generated a downloadable PDF payload.",
                 "Feasibility report payload is incomplete.",
             )
         )

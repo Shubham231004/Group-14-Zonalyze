@@ -18,9 +18,9 @@ from app.db.session import engine
 
 logger = logging.getLogger("zonalyze.poi")
 
-# Matches the radius clamp used for the Overpass query (250 m .. 12 km).
+# Matches the radius clamp used for the Overpass query (250 m .. 25 km).
 _MIN_RADIUS_M = 250
-_MAX_RADIUS_M = 12000
+_MAX_RADIUS_M = 25000
 
 # Same POI tag keys the app cares about (competitors/transit/commercial live under these).
 POI_TAG_KEYS = ("shop", "amenity", "leisure", "office", "craft", "healthcare", "sport", "railway", "highway", "public_transport")
