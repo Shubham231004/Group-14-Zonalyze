@@ -51,13 +51,13 @@ def create_poi_schema() -> None:
         conn.execute(text(POI_SCHEMA_SQL))
 
 
-def _build_tag_clause(tags: List[Tuple[str, str]]) -> Tuple[str, Dict[str, str]]:
+def _build_tag_clause(tags: List[Tuple[str, str]], prefix: str = "") -> Tuple[str, Dict[str, str]]:
     """(key,value) pairs -> a SQL OR clause + bound params. Keys/values both bound."""
     clauses, params = [], {}
     for i, (key, value) in enumerate(tags):
-        clauses.append(f"tags ->> :k{i} = :v{i}")
-        params[f"k{i}"] = str(key)
-        params[f"v{i}"] = str(value)
+        clauses.append(f"tags ->> :{prefix}k{i} = :{prefix}v{i}")
+        params[f"{prefix}k{i}"] = str(key)
+        params[f"{prefix}v{i}"] = str(value)
     return (" OR ".join(clauses) or "FALSE"), params
 
 
@@ -88,24 +88,46 @@ def fetch_pois_from_db(
     center_lon: float,
     radius_km: float,
     limit: int,
+    precise_tags: Optional[List[Tuple[str, str]]] = None,
+    keywords: Optional[List[str]] = None,
 ) -> Optional[List[Dict]]:
     """Radius search over the local POI store.
 
     Returns raw element dicts (possibly empty = a real "none nearby" answer), or
     None when the store is unavailable/not imported yet so the caller falls back
     to Overpass.
+
+    `tags` is deliberately broad (e.g. every restaurant) because osm_service scores
+    relevance in Python. Passing `keywords` (the subcategory's aliases) adds a SQL
+    prefilter so a "pizza shop" search stops dragging every restaurant in the radius
+    over the wire: rows survive only via a `precise_tags` hit or a name/brand/cuisine
+    keyword hit. Python still makes the final call — this only widens what fits under
+    `limit`, which is what makes the count track the radius instead of the row cap.
     """
     if not tags or _poi_ready is False:  # store known-absent -> skip the DB round-trip
         return None
     radius_m = int(max(_MIN_RADIUS_M, min(radius_km * 1000, _MAX_RADIUS_M)))
     tag_clause, params = _build_tag_clause(tags)
     params.update({"lat": center_lat, "lon": center_lon, "radius_m": radius_m, "limit": int(max(limit, 1))})
+
+    prefilter = ""
+    if keywords:
+        precise_clause, precise_params = _build_tag_clause(precise_tags or [], prefix="p")
+        params.update(precise_params)
+        params["kws"] = [f"%{word}%" for word in keywords]
+        prefilter = (
+            f" AND (({precise_clause})"
+            " OR tags ->> 'name' ILIKE ANY(:kws)"
+            " OR tags ->> 'brand' ILIKE ANY(:kws)"
+            " OR tags ->> 'cuisine' ILIKE ANY(:kws))"
+        )
+
     sql = text(
         f"""
         SELECT osm_type, osm_id, lat, lon, tags
         FROM poi
         WHERE ST_DWithin(geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :radius_m)
-          AND ({tag_clause})
+          AND ({tag_clause}){prefilter}
         ORDER BY ST_Distance(geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography)
         LIMIT :limit
         """
@@ -127,6 +149,12 @@ def _demo() -> None:
     assert clause == "tags ->> :k0 = :v0 OR tags ->> :k1 = :v1", clause
     assert params == {"k0": "shop", "v0": "supermarket", "k1": "amenity", "v1": "cafe"}, params
     assert _build_tag_clause([])[0] == "FALSE"
+
+    # Prefixed params must not collide with the broad tag clause's :k0/:v0.
+    pclause, pparams = _build_tag_clause([("cuisine", "pizza")], prefix="p")
+    assert pclause == "tags ->> :pk0 = :pv0", pclause
+    assert pparams == {"pk0": "cuisine", "pv0": "pizza"}, pparams
+    assert set(pparams) & set(params) == set(), "prefixed params collided"
 
     class R:  # stand-in row
         osm_type, osm_id, lat, lon = "node", 42, 43.45, -80.49

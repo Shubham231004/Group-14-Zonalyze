@@ -109,10 +109,27 @@ def _nominatim_row_to_candidate(row: Dict[str, Any], requested_municipality: str
     )
 
 
+# Nominatim allows ~1 request/second and throttles callers that ignore it. The
+# map re-geocodes the active address on every refresh (i.e. every radius change),
+# so without this the same address burned 3 requests per drag and got rate-limited
+# into "could not be geocoded". Successes only — caching a throttled failure would
+# make it permanent for that address.
+_GEOCODE_CACHE: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+
+def _geocode_cache_key(address_line: str, municipality_name: str) -> Tuple[str, str]:
+    return (_normalize_key(address_line), _normalize_key(municipality_name))
+
+
 def _geocode_site_address(address_line: str, municipality_name: str) -> Tuple[Optional[Dict[str, Any]], List[SiteGeocodeCandidate], List[str]]:
     warnings: List[str] = []
     all_rows: List[Dict[str, Any]] = []
     seen = set()
+
+    cached = _GEOCODE_CACHE.get(_geocode_cache_key(address_line, municipality_name))
+    if cached is not None:
+        return dict(cached), [], []
+
     query_variants = [
         f"{address_line}, {municipality_name}, Ontario, Canada",
         f"{address_line}, {municipality_name}, ON, Canada",
@@ -147,6 +164,9 @@ def _geocode_site_address(address_line: str, municipality_name: str) -> Tuple[Op
         except Exception as exc:
             warnings.append(f"Geocoding attempt failed for '{query}': {type(exc).__name__}")
 
+        if all_rows:
+            break  # first variant that resolves wins; don't spend the rate limit re-asking
+
     candidates: List[SiteGeocodeCandidate] = []
     for row in all_rows[:8]:
         candidate = _nominatim_row_to_candidate(row, municipality_name)
@@ -167,7 +187,7 @@ def _geocode_site_address(address_line: str, municipality_name: str) -> Tuple[Op
     if selected is None:
         selected = all_rows[0]
 
-    return {
+    resolved = {
         "latitude": float(selected["lat"]),
         "longitude": float(selected["lon"]),
         "display_name": str(selected.get("display_name") or address_line),
@@ -176,7 +196,9 @@ def _geocode_site_address(address_line: str, municipality_name: str) -> Tuple[Op
         "class": selected.get("class"),
         "resolved_municipality": _extract_resolved_municipality(selected),
         "address": selected.get("address") if isinstance(selected.get("address"), dict) else {},
-    }, candidates, warnings
+    }
+    _GEOCODE_CACHE[_geocode_cache_key(address_line, municipality_name)] = resolved
+    return dict(resolved), candidates, warnings
 
 
 def _poi_to_evidence_item(poi: Dict[str, Any], center_lat: float, center_lon: float) -> Optional[SiteEvidenceItem]:

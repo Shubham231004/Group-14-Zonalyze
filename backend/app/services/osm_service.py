@@ -640,6 +640,8 @@ def _fetch_pois_or_overpass(
     query: str,
     cache_key: str,
     store_only: bool = False,
+    precise_tags: List[Tuple[str, str]] | None = None,
+    keywords: List[str] | None = None,
 ) -> OSMFetchResult:
     """Local PostGIS POI store first (owned, no rate limits); Overpass only if the
     store isn't available yet. Reuses status='live_osm' so downstream relevance
@@ -647,7 +649,10 @@ def _fetch_pois_or_overpass(
 
     store_only=True skips the Overpass fallback entirely — for frequent callers
     (the dashboard) that must never wait on a live network call."""
-    elements = poi_query_service.fetch_pois_from_db(query_tags, center_lat, center_lon, radius_km, limit)
+    elements = poi_query_service.fetch_pois_from_db(
+        query_tags, center_lat, center_lon, radius_km, limit,
+        precise_tags=precise_tags, keywords=keywords,
+    )
     if elements is not None:  # store answered (even 0 rows = a real "none nearby")
         return OSMFetchResult(
             status="live_osm",
@@ -715,10 +720,19 @@ def fetch_osm_competitors(
     catalog_tags = get_osm_tags_for_subcategory(business_subcategory)
     rule = _rule_for_subcategory(business_subcategory)
     query_tags = _dedupe_tags([*catalog_tags, *rule.strong_tags, *rule.weak_tags])
+    # The store row cap used to bind long before the radius did (weak tags like
+    # amenity=restaurant fill it within a few km downtown), so the competitor count
+    # stopped moving when the user widened the reach. Prefiltering in SQL by the
+    # subcategory's own aliases keeps the cap far out of reach instead of raising it.
+    keywords = [w for w in dict.fromkeys([*rule.aliases, *_subcategory_tokens(business_subcategory)]) if w]
+    store_limit = max(limit, 2000)
 
     query = build_overpass_query(query_tags, center_lat, center_lon, radius_km, limit=max(limit, 80))
-    cache_key = f"competitors:v2:{business_subcategory}:{center_lat:.4f}:{center_lon:.4f}:{radius_km}:{limit}"
-    result = _fetch_pois_or_overpass(query_tags, center_lat, center_lon, radius_km, max(limit, 80), query, cache_key, store_only=store_only)
+    cache_key = f"competitors:v3:{business_subcategory}:{center_lat:.4f}:{center_lon:.4f}:{radius_km}:{store_limit}"
+    result = _fetch_pois_or_overpass(
+        query_tags, center_lat, center_lon, radius_km, store_limit, query, cache_key,
+        store_only=store_only, precise_tags=rule.strong_tags, keywords=keywords,
+    )
 
     normalized: List[Dict] = []
     seen = set()
@@ -747,7 +761,7 @@ def fetch_osm_competitors(
     else:
         note = result.note
 
-    return OSMFetchResult(status=result.status, note=note, elements=normalized[:limit])
+    return OSMFetchResult(status=result.status, note=note, elements=normalized[:store_limit])
 
 
 def fetch_osm_transit(
