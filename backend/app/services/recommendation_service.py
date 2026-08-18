@@ -95,7 +95,15 @@ def build_recommendation_decision(
     revenue_strength = 30.0 if predicted_revenue > 15000 else 18.0 if predicted_revenue > 5000 else 7.0 if predicted_revenue > 0 else -8.0
     feasibility_strength = (predicted_feasibility - 50.0) * 0.55
     demand_strength = (demand_index - 50.0) * 0.25
-    competition_penalty = max(0.0, competition_index - 55.0) * 0.25
+    # Continuous across the whole 0-100 range, not just above a 55 threshold: the old
+    # formula maxed out at (100-55)*0.25 = 11.25 points EVEN AT MAXIMUM saturation,
+    # smaller than a single revenue tier step (30 vs 18 = 12). A real 200-competitor
+    # market (Toronto Pizza Shop, 5km -> competition_index 62.3) could barely dent a
+    # strong revenue+feasibility read, so the raw score cleared 100 before the clamp
+    # and landed on a suspiciously round, competition-blind ceiling. 0.35 puts
+    # saturated competition's downside (35 pts) in the same league as feasibility's
+    # (27.5) and revenue's (38 max swing) instead of a rounding error next to them.
+    competition_penalty = competition_index * 0.35
     lease_penalty = 12.0 if lease_median > 9000 else 7.0 if lease_median > 6500 else 2.0 if lease_median > 4000 else 0.0
     risk_penalty = 22.0 if predicted_risk == "high" else 10.0 if predicted_risk == "medium" else 0.0
     high_risk_penalty = high_risk_prob * 16.0
