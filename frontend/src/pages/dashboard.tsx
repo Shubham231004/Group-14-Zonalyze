@@ -983,7 +983,12 @@ export default function Dashboard() {
             {activeTab === "map" && (
               <div className="space-y-5">
                 <motion.section {...revealMotion} className="decision-strip">
-                  <div className="decision-score"><strong>{feasibilityScore.toFixed(0)}</strong><span>/100</span></div>
+                  {/* The headline number on the landing tab is the DECISION score, the
+                      same one the compare table ranks by and the sentence beside it
+                      quotes. It used to show feasibility under a bare "/100", so
+                      applying the compare table's winner appeared to change its score
+                      (compare said 90.7, this ring said 68 — two different metrics). */}
+                  <div className="decision-score"><strong>{(recommendationDecision?.decision_score ?? feasibilityScore).toFixed(0)}</strong><span>decision score</span></div>
                   <div className="decision-copy"><p className="eyebrow">Your first read</p><h2>{recommendationLabel}</h2><p>{recommendationDecision?.decision_summary || explanation?.feasibility_explanation || "Your feasibility result is ready. Explore the map and evidence below."}</p></div>
                   <div className="decision-actions"><Button variant="outline" className="rounded-full" onClick={handleSaveScenario} disabled={isSavingScenario}><Save />{isSavingScenario ? "Saving…" : "Save spot"}</Button><Button className="rounded-full" onClick={() => handleTabChange("history")}><GitCompare />Compare</Button></div>
                 </motion.section>
@@ -1054,7 +1059,7 @@ export default function Dashboard() {
                           <span>{index + 1}</span>
                           <div><strong>{item.municipality_name}</strong><p>{item.business_subcategory} · {item.radius_km} km</p></div>
                           <div className="saved-list-actions">
-                            <div className="saved-score"><strong>{item.predicted_feasibility_score?.toFixed(0) ?? "—"}</strong><small>/100</small></div>
+                            <div className="saved-score" title="Feasibility score"><strong>{item.predicted_feasibility_score?.toFixed(0) ?? "—"}</strong><small>feas</small></div>
                             <button
                               type="button"
                               className="saved-delete"
