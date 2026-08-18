@@ -1058,7 +1058,15 @@ export default function Dashboard() {
                 <motion.section {...revealMotion} className="metric-row">
                   <article><DollarSign /><p>Predicted monthly net</p><strong>{formatCurrency(ml?.predicted_monthly_net_revenue)}</strong><span className={indicatorTextClass(dashboardData.revenue_monitor.indicator)}>{indicatorLabelForRevenue(dashboardData.revenue_monitor.indicator)} outlook</span></article>
                   <article><AlertTriangle /><p>Business risk</p><strong>{ml?.predicted_risk_class?.replaceAll("_", " ") || "N/A"}</strong><span className={indicatorTextClass(dashboardData.risk_monitor.indicator)}>{indicatorLabelForRisk(dashboardData.risk_monitor.indicator)} risk</span></article>
-                  <article><ShieldCheck /><p>Decision confidence</p><strong>{recommendationDecision?.decision_confidence_score?.toFixed(0) ?? credibility?.overall_confidence_score?.toFixed(0) ?? "N/A"}<small>/100</small></strong><span>{credibility?.confidence_level || "Evidence based"} confidence</span></article>
+                  {/* Word and number must come from the SAME score. This tile used to
+                      print decision_confidence_score beside credibility.confidence_level,
+                      which is banded off a different score at different thresholds
+                      (80/65/50 vs 75/55/35) — so the number could read one band and the
+                      word another. recommendationDecision.confidence_level is the band
+                      for the number actually shown; credibility is only the fallback for
+                      when the whole decision layer is missing, and then its own score is
+                      what gets displayed too. */}
+                  <article><ShieldCheck /><p>Decision confidence</p><strong>{recommendationDecision?.decision_confidence_score?.toFixed(0) ?? credibility?.overall_confidence_score?.toFixed(0) ?? "N/A"}<small>/100</small></strong><span>{(recommendationDecision ? recommendationDecision.confidence_level : credibility?.confidence_level) || "Evidence based"} confidence</span></article>
                 </motion.section>
                 <motion.div {...revealMotion} className="verdict-detail-grid">
                   <Card className="plain-card"><CardHeader><CardTitle>What helps this spot</CardTitle></CardHeader><CardContent className="factor-list positive">{(recommendationDecision?.major_strengths || explanation?.top_positive_factors || []).slice(0, 5).map((factor) => <p key={factor}><span><TrendingUp /></span>{factor}</p>)}</CardContent></Card>
