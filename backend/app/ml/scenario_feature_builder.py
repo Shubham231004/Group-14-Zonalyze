@@ -95,6 +95,13 @@ def get_city_row(municipality_name: str) -> pd.Series:
             f"Example available municipalities: {available}"
         )
 
+    # Ontario has two census subdivisions named "Hamilton": the city (~570k) and a
+    # township near Cobourg (~12k). Requests carry only the name, so taking the first
+    # row silently answered "Hamilton" with whichever the CSV happened to list first.
+    # Pick the largest population — the place a user typing that name means.
+    if len(match) > 1 and "population_2021" in match.columns:
+        return match.loc[match["population_2021"].idxmax()]
+
     return match.iloc[0]
 
 

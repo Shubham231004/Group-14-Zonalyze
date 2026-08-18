@@ -11,6 +11,12 @@ import type { GeospatialMarketContext } from "@/services/api";
 type Props = {
   geoContext: GeospatialMarketContext;
   className?: string;
+  // The dashboard's own accurate count (unlimited search, not capped for
+  // rendering). Optional so this component doesn't hard-require a caller
+  // that hasn't fetched it. Used only to make the footer honest about the
+  // gap between "shown on map" and "actually nearby" instead of silently
+  // capping and calling it total (see MapFooter).
+  trueCompetitorCount?: number;
 };
 
 type NormalizedMarker = {
@@ -517,7 +523,30 @@ function MapHeader({ geoContext, radiusKm, mode }: { geoContext: GeospatialMarke
   );
 }
 
-function MapFooter({ geoContext, radiusKm, markerCount, mode }: { geoContext: GeospatialMarketContext; radiusKm: number; markerCount: number; mode: "mapbox" | "openstreetmap" }) {
+function MapFooter({
+  geoContext,
+  radiusKm,
+  markerCount,
+  trueCompetitorCount,
+  mode,
+}: {
+  geoContext: GeospatialMarketContext;
+  radiusKm: number;
+  markerCount: number;
+  trueCompetitorCount?: number;
+  mode: "mapbox" | "openstreetmap";
+}) {
+  // The map only ever renders the closest `markerCount` pins (a hard cap so the
+  // page doesn't try to draw hundreds of markers), while trueCompetitorCount is
+  // the real, uncapped count shown in the "Nearby Competition" stat elsewhere on
+  // the page. Printing markerCount alone here used to read as a second, silently
+  // different "total" that never matched the real stat -- say what's actually
+  // being shown instead.
+  const evidenceLabel =
+    trueCompetitorCount != null && trueCompetitorCount > markerCount
+      ? `${markerCount} of ${trueCompetitorCount} nearby markers shown (closest)`
+      : `${markerCount} map evidence marker(s)`;
+
   return (
     <div className="grid gap-3 border-t border-border px-5 py-4 text-[11px] text-muted-foreground md:grid-cols-3">
       <div>
@@ -526,7 +555,7 @@ function MapFooter({ geoContext, radiusKm, markerCount, mode }: { geoContext: Ge
       </div>
       <div>
         <p className="font-mono uppercase tracking-widest text-muted-foreground">Evidence</p>
-        <p className="mt-1 text-muted-foreground">{markerCount} map evidence marker(s)</p>
+        <p className="mt-1 text-muted-foreground">{evidenceLabel}</p>
       </div>
       <div>
         <p className="font-mono uppercase tracking-widest text-muted-foreground">Map source</p>
@@ -659,6 +688,14 @@ function MapboxRenderer({ geoContext, center, radiusKm, markers }: { geoContext:
     if (!map || !mapboxToken) return;
 
     const updateMap = () => {
+      // Cancel any in-flight fitBounds animation (from a prior radius/city change)
+      // before jumping the camera again. Without this, an instant setCenter mid-
+      // animation and the animated fitBounds below can fight over the same frames,
+      // leaving the map's internal transform briefly inconsistent -- markers project
+      // off their true lng/lat during exactly that window (reproducible by dragging
+      // the reach slider or zooming rapidly: pins land far outside the radius until
+      // the next stable render).
+      map.stop();
       map.resize();
       map.setCenter([center[1], center[0]]);
 
@@ -780,7 +817,7 @@ function LeafletRenderer({ geoContext, center, radiusKm, markers }: { geoContext
   );
 }
 
-export default function MarketMap({ geoContext, className = "" }: Props) {
+export default function MarketMap({ geoContext, className = "", trueCompetitorCount }: Props) {
   const center = getCenter(geoContext);
   const radiusKm = Number.isFinite(geoContext.radius_km) && geoContext.radius_km > 0 ? geoContext.radius_km : 5;
   const markers = useMemo(() => normalizeMarkers(geoContext), [geoContext]);
@@ -797,7 +834,13 @@ export default function MarketMap({ geoContext, className = "" }: Props) {
         <LeafletRenderer geoContext={geoContext} center={center} radiusKm={radiusKm} markers={markers} />
       )}
 
-      <MapFooter geoContext={geoContext} radiusKm={radiusKm} markerCount={markers.length} mode={mode} />
+      <MapFooter
+        geoContext={geoContext}
+        radiusKm={radiusKm}
+        markerCount={markers.length}
+        trueCompetitorCount={trueCompetitorCount}
+        mode={mode}
+      />
     </div>
   );
 }

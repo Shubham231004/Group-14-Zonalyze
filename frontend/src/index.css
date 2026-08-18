@@ -1094,3 +1094,16 @@ html { scroll-behavior: smooth; }
     display: none;
   }
 }
+
+/* Mapbox GL assigns role="button" to any marker with a popup attached (for
+   keyboard/a11y), which accidentally matches the shared button-motion rule
+   above and overrides Mapbox's own position:absolute to relative. That makes
+   the marker also participate in normal document flow, so it renders at
+   "correct transform" + "accumulated flow offset" -- pins land far outside
+   the search radius, worse at low zoom. Carve markers back out explicitly
+   rather than touching the shared button selector. */
+.mapboxgl-marker[role="button"] {
+  position: absolute !important;
+  isolation: auto;
+  overflow: visible;
+}

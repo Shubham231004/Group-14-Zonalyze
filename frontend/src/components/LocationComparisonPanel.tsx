@@ -204,7 +204,7 @@ export default function LocationComparisonPanel({
           <div className="grid grid-cols-12 bg-card px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             <div className="col-span-1">Rank</div>
             <div className="col-span-3">Location</div>
-            <div className="col-span-2">Score</div>
+            <div className="col-span-2">Decision score</div>
             <div className="col-span-2">Revenue</div>
             <div className="col-span-2">Feasibility</div>
             <div className="col-span-2">Risk</div>
@@ -216,6 +216,9 @@ export default function LocationComparisonPanel({
                 <p className="font-semibold text-foreground">{item.municipality_name}</p>
                 <p className="text-xs text-muted-foreground">
                   {Number(item.radius_km).toLocaleString(undefined, { maximumFractionDigits: 1 })} km radius
+                  {typeof item.observed_competitor_count === "number"
+                    ? ` · ${item.observed_competitor_count} mapped competitor${item.observed_competitor_count === 1 ? "" : "s"}`
+                    : ""}
                 </p>
               </div>
               <div className={`col-span-2 font-semibold ${scoreClass(item.decision_score)}`}>{item.decision_score.toFixed(1)}/100</div>

@@ -171,6 +171,9 @@ export interface RecommendationEvidenceSignal {
 export interface RecommendationDecisionResponse {
   final_recommendation: string;
   recommendation_label: string;
+  // Same 0-100 score the "Compare spots" table ranks by. Shown in decision_summary
+  // prose so the two screens can be checked against each other.
+  decision_score: number;
   decision_confidence_score: number;
   confidence_level: string;
   decision_summary: string;

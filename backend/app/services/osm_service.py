@@ -489,6 +489,16 @@ def _competitor_relevance_score(item: Dict, business_subcategory: str) -> Tuple[
         score -= 45
         reasons.append("broad tag without business-specific name/tag evidence")
 
+    # A category-tagged business whose own name/brand carries a defining term for this
+    # subcategory IS a competitor. Without this, a single alias hit on a broad tag scored
+    # 22 + 28 = 50 against the niche rules' 55 threshold, so "Desi Point" (shop=convenience,
+    # name matches "desi") was dropped from an Indian-grocery scan — a false negative
+    # anyone can spot on the map. Two independent signals clear the bar; a reject term
+    # still wins, because that is the case where the name is misleading.
+    if alias_hits and (strong_tag_hit or weak_tag_hit) and not reject_hits:
+        score = max(score, rule.min_score)
+        reasons.append("name/brand matches this business type and the OSM category fits")
+
     return score, reasons
 
 
@@ -724,13 +734,19 @@ def fetch_osm_competitors(
     # amenity=restaurant fill it within a few km downtown), so the competitor count
     # stopped moving when the user widened the reach. Prefiltering in SQL by the
     # subcategory's own aliases keeps the cap far out of reach instead of raising it.
+    #
+    # search_limit (candidates considered) and `limit` (results actually returned)
+    # are deliberately different: widening the search fixed the radius bug, but
+    # returning all of it to every caller flooded the map with hundreds of un-
+    # clustered pins that were never meant to render (only a count needs the full
+    # number — see dashboard_service, which asks for a high `limit` on purpose).
     keywords = [w for w in dict.fromkeys([*rule.aliases, *_subcategory_tokens(business_subcategory)]) if w]
-    store_limit = max(limit, 2000)
+    search_limit = max(limit, 2000)
 
     query = build_overpass_query(query_tags, center_lat, center_lon, radius_km, limit=max(limit, 80))
-    cache_key = f"competitors:v3:{business_subcategory}:{center_lat:.4f}:{center_lon:.4f}:{radius_km}:{store_limit}"
+    cache_key = f"competitors:v4:{business_subcategory}:{center_lat:.4f}:{center_lon:.4f}:{radius_km}:{limit}"
     result = _fetch_pois_or_overpass(
-        query_tags, center_lat, center_lon, radius_km, store_limit, query, cache_key,
+        query_tags, center_lat, center_lon, radius_km, search_limit, query, cache_key,
         store_only=store_only, precise_tags=rule.strong_tags, keywords=keywords,
     )
 
@@ -755,13 +771,23 @@ def fetch_osm_competitors(
     normalized.sort(key=lambda row: (-int(row.get("relevance_score", 0)), row["distance_km"]))
 
     if result.status == "live_osm":
+        kept = len(normalized)
         note = (
-            f"OpenStreetMap returned {raw_count} raw POIs. Zonalyze kept {len(normalized)} after universal competitor relevance scoring for '{business_subcategory}'."
+            f"Scanned {raw_count} mapped businesses within {radius_km:g} km whose OpenStreetMap "
+            f"category could plausibly compete with '{business_subcategory}', and kept {kept} "
+            f"after relevance scoring (name, brand, cuisine and category tags)."
         )
+        # A count equal to the cap is a floor, not a total. Saying so beats quietly
+        # presenting a truncated number as if it were the whole market.
+        if kept > limit:
+            note += (
+                f" More than {limit} matched, so the reported count is capped at {limit} "
+                "and should be read as 'at least'."
+            )
     else:
         note = result.note
 
-    return OSMFetchResult(status=result.status, note=note, elements=normalized[:store_limit])
+    return OSMFetchResult(status=result.status, note=note, elements=normalized[:limit])
 
 
 def fetch_osm_transit(

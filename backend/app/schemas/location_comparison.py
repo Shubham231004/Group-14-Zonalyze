@@ -48,6 +48,10 @@ class LocationComparisonItem(BaseModel):
     recommendation: str
     high_risk_probability: float
     competition_pressure_index: float
+    # Real mapped competitors in the radius (None when the POI store could not answer
+    # and the row fell back to the catalog seed). Shown next to the pressure index so a
+    # ranking can be checked against a countable fact.
+    observed_competitor_count: Optional[int] = None
     demand_pressure_index: float
     rent_pressure_index: float
     reachable_population_estimate: float

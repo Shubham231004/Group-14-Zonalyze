@@ -14,6 +14,10 @@ class RecommendationEvidenceSignal(BaseModel):
 class RecommendationDecision(BaseModel):
     final_recommendation: str
     recommendation_label: str
+    # The 0-100 score the recommendation label is derived from. It used to live only
+    # inside decision_summary prose, so the comparison table had to invent its own —
+    # and the two disagreed. Exposed so every surface shows this one number.
+    decision_score: float
     decision_confidence_score: float
     confidence_level: str
     decision_summary: str

@@ -220,11 +220,13 @@ function MarketMapPanel({
   isLoading,
   error,
   onRetry,
+  trueCompetitorCount,
 }: {
   geoContext: GeospatialMarketContext | null;
   isLoading: boolean;
   error: string | null;
   onRetry: () => void;
+  trueCompetitorCount?: number;
 }) {
   if (!geoContext) {
     return (
@@ -258,6 +260,7 @@ function MarketMapPanel({
     <MarketMap
       geoContext={geoContext}
       className="scada-panel border-border shadow-2xl rounded-2xl overflow-hidden min-h-[500px]"
+      trueCompetitorCount={trueCompetitorCount}
     />
   );
 }
@@ -989,7 +992,7 @@ export default function Dashboard() {
                   <div className="map-primary-column">
                     <div className="map-section-heading"><div><p className="eyebrow">See what surrounds the spot</p><h2>Competition on the map</h2></div><span className="map-source-badge"><span />{competitionIsLiveOsm ? "Live market evidence" : "Market evidence"}</span></div>
                     {geoContext ? <div className={`anchor-note ${geoContext.anchor_type === "address" ? "address" : "city"}`}><MapPin />{geoContext.anchor_note || (geoContext.anchor_type === "address" ? `Centred on ${geoContext.resolved_address}` : `Centred on ${geoContext.municipality_name} city centre.`)}</div> : null}
-                    <div className="map-frame"><MarketMapPanel geoContext={geoContext} isLoading={isGeoLoading} error={geoError} onRetry={() => loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest)} /></div>
+                    <div className="map-frame"><MarketMapPanel geoContext={geoContext} isLoading={isGeoLoading} error={geoError} onRetry={() => loadGeoContext(activeGeoPayload as GeospatialMarketMapRequest)} trueCompetitorCount={competitorCount} /></div>
                   </div>
 
                   <aside className="map-insight-rail">
@@ -1004,7 +1007,7 @@ export default function Dashboard() {
             {activeTab === "overview" && (
               <div className="verdict-layout">
                 <motion.section {...revealMotion} className="verdict-hero-card">
-                  <div className="verdict-ring"><strong>{feasibilityScore.toFixed(0)}</strong><span>out of 100</span></div>
+                  <div className="verdict-ring"><strong>{feasibilityScore.toFixed(0)}</strong><span>feasibility / 100</span></div>
                   <div className="verdict-main"><p className="eyebrow">BestSpot verdict</p><h2>{recommendationLabel}</h2><p>{recommendationDecision?.decision_rationale || explanation?.feasibility_explanation}</p><div className="verdict-guidance"><Navigation /><span>{recommendationDecision?.action_guidance || "Use the evidence below to confirm the location before making a lease commitment."}</span></div></div>
                 </motion.section>
                 <motion.section {...revealMotion} className="metric-row">

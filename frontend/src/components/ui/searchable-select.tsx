@@ -110,7 +110,12 @@ export function SearchableSelect({
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
-                  key={option.value}
+                  // Keyed by label, not value: two Ontario municipalities share the
+                  // name "Hamilton" (the city and the township), so keying by value
+                  // gave React duplicate keys — and duplicate keys let it commit a
+                  // DIFFERENT option than the one clicked. Labels carry the type
+                  // suffix and are unique.
+                  key={option.label}
                   value={option.label}
                   onSelect={() => commit(option.value)}
                 >

@@ -124,6 +124,7 @@ def build_osm_competition_evidence(
     population: float,
     osm_elements: List[Dict[str, Any]],
     is_live: bool,
+    scan_note: str = "",
 ) -> Optional[CompetitionObservationEvidence]:
     """Build competition evidence from REAL OpenStreetMap competitor POIs.
 
@@ -165,7 +166,11 @@ def build_osm_competition_evidence(
         chain_share_pct=None,
         competition_pressure_index=pressure,
         data_quality_note=(
-            "Real count of competitor businesses mapped in OpenStreetMap within the radius. "
+            # The scan funnel travels with the number so "why 8 and not 60?" is answerable
+            # from the UI: it says how many businesses were considered and how many
+            # survived relevance scoring, instead of presenting a bare count.
+            (scan_note + " " if scan_note else "")
+            + "Real count of competitor businesses mapped in OpenStreetMap within the radius. "
             "OSM coverage varies by area and some businesses may be unmapped, so treat this as a "
             "strong but incomplete (lower-bound) observation, not a full census of the market."
         ),

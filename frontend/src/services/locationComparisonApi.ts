@@ -20,6 +20,7 @@ export type LocationComparisonItem = {
   recommendation: string;
   high_risk_probability: number;
   competition_pressure_index: number;
+  observed_competitor_count?: number | null;
   demand_pressure_index: number;
   rent_pressure_index: number;
   reachable_population_estimate: number;

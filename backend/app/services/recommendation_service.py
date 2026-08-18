@@ -224,6 +224,7 @@ def build_recommendation_decision(
     return RecommendationDecision(
         final_recommendation=final_recommendation,
         recommendation_label=recommendation_label,
+        decision_score=round(decision_score, 2),
         decision_confidence_score=round(decision_confidence, 2),
         confidence_level=confidence_level,
         decision_summary=decision_summary,

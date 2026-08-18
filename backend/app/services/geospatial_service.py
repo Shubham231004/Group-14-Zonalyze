@@ -430,6 +430,13 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
             demand = None
             lease = None
 
+    # The map's own competition_evidence (observed_competitor_count, pressure index)
+    # is built from this SAME fetch below, to avoid a second network/DB round-trip.
+    # It must therefore be uncapped (matching dashboard_service's accurate count) --
+    # MAP_RENDER_LIMIT below trims to a sane pin count for the marker LOOP only, not
+    # for what gets fetched or what the evidence count is computed from.
+    MAP_RENDER_LIMIT = 60
+
     def _fetch_competitors() -> OSMFetchResult:
         if dynamic_resolution is not None:
             if dynamic_resolution.status == "resolved" and dynamic_resolution.osm_tags:
@@ -439,7 +446,7 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
                     center_lat=center_lat,
                     center_lon=center_lng,
                     radius_km=radius_km,
-                    limit=60,
+                    limit=2000,
                 )
             return OSMFetchResult(
                 status="business_resolution_needs_review",
@@ -454,7 +461,7 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
             center_lat=center_lat,
             center_lon=center_lng,
             radius_km=radius_km,
-            limit=60,
+            limit=2000,
         )
 
     # The two OSM queries are independent network calls. Running them in parallel
@@ -474,22 +481,19 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
         competitor_result = competitor_future.result()
         transit_result = transit_future.result()
 
-    competitor_pois = enrich_missing_addresses(
-        competitor_result.elements,
-        max_requests=20,
-    )
-
-    # Real-data competition: build sourced evidence from the OSM competitors the
-    # map already fetched (zero extra latency). Prefer this over the catalog seed /
-    # formula proxy. This is display/decision evidence only — the ML feature vector
-    # is untouched. Falls back to the seed observation when OSM is not live.
+    # Evidence (the "Nearby Competition" count) uses the FULL fetched list -- it
+    # must match dashboard_service's accurate count. Only the marker LOOP below
+    # gets trimmed to MAP_RENDER_LIMIT, and address enrichment (a bounded number
+    # of Mapbox calls) only runs on that trimmed slice, since addresses are only
+    # ever shown in pin popups, never in the evidence count itself.
     osm_population = _safe_float(features.get("population_2021"), 0.0)
     osm_competition_evidence = build_osm_competition_evidence(
         municipality_name=municipality_name,
         business_subcategory=display_business_name,
         population=osm_population,
-        osm_elements=competitor_pois,
+        osm_elements=competitor_result.elements,
         is_live=(competitor_result.status == "live_osm"),
+        scan_note=competitor_result.note,
     )
     if osm_competition_evidence is not None:
         authoritative_competition = osm_competition_evidence
@@ -500,6 +504,11 @@ def build_geospatial_market_context(request: GeospatialMarketRequest | AnalyzeSc
         competition_evidence_source = (
             "catalog_seed" if seed_method.startswith("data_catalog") else "proxy"
         )
+
+    competitor_pois = enrich_missing_addresses(
+        competitor_result.elements[:MAP_RENDER_LIMIT],
+        max_requests=20,
+    )
 
     markers: List[MapMarker] = []
 

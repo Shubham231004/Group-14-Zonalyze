@@ -137,6 +137,19 @@ async def models_unavailable_handler(request: Request, exc: ModelsUnavailableErr
     )
 
 
+@app.exception_handler(ValueError)
+async def unknown_input_handler(request: Request, exc: ValueError):
+    """A municipality or business type that isn't in the catalog is bad input, not a
+    server fault. The feature builder already raises a ValueError naming the field and
+    listing valid examples — pass that through as a 400 so the UI can say what to fix,
+    instead of the generic 'An unexpected error occurred.' 500."""
+    logger.info("Rejected unknown input on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=400,
+        content={"error": "invalid_input", "message": str(exc)},
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Log full detail server-side; return a sanitized message to the client."""

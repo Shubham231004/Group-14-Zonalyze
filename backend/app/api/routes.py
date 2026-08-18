@@ -55,6 +55,7 @@ from app.services.competition_data_service import get_competition_observation, l
 from app.services.lease_cost_data_service import get_lease_cost_evidence, list_lease_cost_observations
 from app.services.demand_data_service import get_demand_evidence, list_demand_observations
 from app.services.recommendation_service import build_recommendation_decision
+from app.services.scenario_scoring_service import score_scenario
 
 from app.services.scenario_history_service import (
     clear_saved_scenarios,
@@ -196,45 +197,14 @@ def location_comparison_route(request: LocationComparisonRequest):
 
 @router.post("/recommendation/decision", response_model=RecommendationDecision)
 def recommendation_decision_route(request: AnalyzeScenarioRequest):
-    features = build_prediction_features(
+    # Same shared core as the dashboard and the comparison table. This route used to
+    # assemble its own copy, which skipped the prediction consistency guard and read the
+    # catalog seed instead of the real POI count -- a third answer for one scenario.
+    return score_scenario(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
-    )
-    features["municipality_name"] = request.municipality_name
-    # Evidence is display/decision context only; the model scores the clean,
-    # training-consistent feature row (evidence must not mutate model inputs).
-    competition_evidence = get_competition_observation(
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-        population=float(features.get("population_2021", 0) or 0),
-    )
-    lease_cost_evidence = get_lease_cost_evidence(
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-        features=features,
-    )
-    demand_evidence = get_demand_evidence(
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-        features=features,
-    )
-    prediction_result = get_predictor().predict(features)
-    credibility = build_prediction_credibility(
-        features=features,
-        prediction_result=prediction_result,
-    )
-    return build_recommendation_decision(
-        features=features,
-        prediction_result=prediction_result,
-        credibility=credibility,
-        competition_evidence=competition_evidence,
-        lease_cost_evidence=lease_cost_evidence,
-        demand_evidence=demand_evidence,
-    )
+    ).decision
 
 @router.get("/ai/status", response_model=LocalAIStatusResponse)
 def local_ai_status_route():

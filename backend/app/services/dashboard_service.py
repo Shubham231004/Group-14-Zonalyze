@@ -1,7 +1,5 @@
 from sqlalchemy.orm import Session
 
-from app.ml.predictor import get_predictor
-from app.ml.scenario_feature_builder import build_prediction_features
 from app.schemas.dashboard import (
     AnalysisBreakdownResponse,
     DashboardSummaryResponse,
@@ -10,16 +8,11 @@ from app.schemas.dashboard import (
 )
 from app.schemas.scenario import AnalyzeScenarioRequest
 from app.services.competition_service import analyze_competition
-from app.services.competition_data_service import get_competition_observation
-from app.services.credibility_service import build_prediction_credibility
 from app.services.demand_service import analyze_demand
-from app.services.demand_data_service import get_demand_evidence
 from app.services.explanation_service import build_prediction_explanation
 from app.services.lease_cost_service import analyze_lease_cost
-from app.services.lease_cost_data_service import get_lease_cost_evidence
 from app.services.people_location_service import get_people_location_packet
-from app.services.prediction_consistency_service import apply_prediction_consistency_guard
-from app.services.recommendation_service import build_recommendation_decision
+from app.services.scenario_scoring_service import score_scenario
 
 
 DEFAULT_MUNICIPALITY = "Kitchener"
@@ -43,96 +36,26 @@ def get_dashboard_summary(db: Session) -> DashboardSummaryResponse:
 
 
 def analyze_scenario(request: AnalyzeScenarioRequest, db: Session) -> DashboardSummaryResponse:
-    # The feature row is built by the shared pipeline (app.ml.feature_pipeline),
-    # which is the SAME logic used to train the models. To keep predictions
-    # trustworthy, the model is scored on this clean, training-consistent feature
-    # vector. Evidence services below are read-only: they produce display/decision
-    # objects but must NOT mutate the model feature vector, because their proxy
-    # values are on a different scale than the model was trained on and would
-    # re-introduce the train/inference skew we just removed.
-    features = build_prediction_features(
+    # Features, prediction, evidence and the recommendation all come from the shared
+    # scenario core, so this dashboard and the location-comparison table can never
+    # disagree about the same scenario. Everything below is presentation only.
+    scored = score_scenario(
         municipality_name=request.municipality_name,
         business_subcategory=request.business_subcategory,
         radius_km=request.radius_km,
     )
-    features["municipality_name"] = request.municipality_name
-
-    # City-centre coords let the AI-facing evidence (chat, Evidence tab, snapshot)
-    # use the SAME real POI store as the map — real competitors + real
-    # transit/foot-traffic — instead of seed proxies. Same resolver as the map.
-    from app.services.competition_data_service import build_osm_competition_evidence
-    from app.services.geospatial_service import _center_for_municipality
-    from app.services.osm_service import fetch_osm_competitors
-
-    center_lat, center_lon = _center_for_municipality(request.municipality_name)
-    population = float(features.get("population_2021", 0) or 0)
-
-    # Real competition from the owned POI store; falls back to the seed observation
-    # when the store isn't imported (build_osm_competition_evidence returns None).
-    osm_competitors = fetch_osm_competitors(
-        request.business_subcategory, center_lat, center_lon, request.radius_km, store_only=True
-    )
-    competition_evidence = build_osm_competition_evidence(
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        population=population,
-        osm_elements=osm_competitors.elements,
-        is_live=osm_competitors.status == "live_osm",
-    ) or get_competition_observation(
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-        population=population,
-    )
-
-    lease_cost_evidence = get_lease_cost_evidence(
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-        features=features,
-    )
-
-    demand_evidence = get_demand_evidence(
-        municipality_name=request.municipality_name,
-        business_subcategory=request.business_subcategory,
-        radius_km=request.radius_km,
-        features=features,
-        center_lat=center_lat,
-        center_lon=center_lon,
-    )
-
-    predictor = get_predictor()
-    raw_prediction_result = predictor.predict(features)
-    prediction_result = apply_prediction_consistency_guard(
-        prediction_result=raw_prediction_result,
-        features=features,
-    )
+    features = scored.features
+    prediction_result = scored.prediction
+    prediction_credibility = scored.credibility
+    competition_evidence = scored.competition_evidence
+    lease_cost_evidence = scored.lease_cost_evidence
+    demand_evidence = scored.demand_evidence
+    recommendation_decision = scored.decision
 
     explanation = build_prediction_explanation(
         features=features,
         prediction_result=prediction_result,
     )
-    prediction_credibility = build_prediction_credibility(
-        features=features,
-        prediction_result=prediction_result,
-    )
-
-    recommendation_decision = build_recommendation_decision(
-        features=features,
-        prediction_result=prediction_result,
-        credibility=prediction_credibility,
-        competition_evidence=competition_evidence,
-        lease_cost_evidence=lease_cost_evidence,
-        demand_evidence=demand_evidence,
-    )
-
-    # Keep the legacy ml_prediction.recommendation field aligned with the new
-    # recommendation decision layer so older frontend code still receives the
-    # best available recommendation label.
-    prediction_result = {
-        **prediction_result,
-        "recommendation": recommendation_decision.final_recommendation,
-    }
 
     analysis_breakdown = AnalysisBreakdownResponse(
         demand_analysis=analyze_demand(features),
