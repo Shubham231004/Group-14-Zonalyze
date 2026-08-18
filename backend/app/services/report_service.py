@@ -23,6 +23,10 @@ PAPER = colors.HexColor("#fbf8f3")
 LINE = colors.HexColor("#e6ddd4")
 LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "bestspot-logo.png"
 TEAM_MEMBERS = "Shubham Patel | Girish Bhuteja | Kalp Mehta | Jainish Prajapati"
+# Reports get shared onward. A clickable address on every page is how a forwarded
+# PDF brings the next reader back to the product instead of dead-ending.
+SITE_URL = "https://www.bestspot.biz"
+SITE_LABEL = "www.bestspot.biz"
 
 
 def _plain(value: Any, fallback: str = "Not available") -> str:
@@ -193,9 +197,21 @@ def _draw_letterhead(canvas: Canvas, doc: SimpleDocTemplate) -> None:
     canvas.setFillColor(INK)
     canvas.setFont("Helvetica-Bold", 7.2)
     canvas.drawRightString(width - doc.rightMargin, 39, TEAM_MEMBERS)
+    right = width - doc.rightMargin
+    page_text = f"  |  Page {doc.page}"
     canvas.setFillColor(MUTED)
     canvas.setFont("Helvetica", 7)
-    canvas.drawRightString(width - doc.rightMargin, 25, f"BestSpot.biz | Page {doc.page}")
+    canvas.drawRightString(right, 25, page_text)
+
+    page_w = canvas.stringWidth(page_text, "Helvetica", 7)
+    url_w = canvas.stringWidth(SITE_LABEL, "Helvetica-Bold", 7)
+    url_x = right - page_w - url_w
+    canvas.setFillColor(BRAND_RED)
+    canvas.setFont("Helvetica-Bold", 7)
+    canvas.drawString(url_x, 25, SITE_LABEL)
+    # linkURL makes the drawn text an actual clickable annotation; drawString alone
+    # only paints glyphs, which look like a link and do nothing.
+    canvas.linkURL(SITE_URL, (url_x, 20, url_x + url_w, 33), relative=0, thickness=0)
     canvas.restoreState()
 
 

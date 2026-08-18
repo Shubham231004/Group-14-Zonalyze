@@ -54,6 +54,15 @@ import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import QRCode from "qrcode";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -296,6 +305,8 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [isUpdating, setIsUpdating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [shareQrDataUrl, setShareQrDataUrl] = useState<string | null>(null);
   const [scenarioHistory, setScenarioHistory] = useState<ScenarioHistoryItem[]>([]);
   const [geoContext, setGeoContext] = useState<GeospatialMarketContext | null>(null);
   // The market map loads independently of the scenario analysis so a slow or
@@ -671,6 +682,35 @@ export default function Dashboard() {
     }
   };
 
+  // The QR points at the PUBLIC report route, not the authed one: a phone scanning
+  // it has no Clerk session, so /reports/feasibility would only ever 401. Built on
+  // the client — there is nothing to mint, the URL is just the scenario.
+  const shareReportUrl = useMemo(() => {
+    const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://127.0.0.1:8000";
+    const params = new URLSearchParams({
+      municipality_name: municipalityName,
+      business_subcategory: businessSubcategory,
+      radius_km: String(radius[0]),
+    });
+    return `${base}/public/report?${params.toString()}`;
+  }, [municipalityName, businessSubcategory, radius]);
+
+  useEffect(() => {
+    if (!isExportOpen) return;
+    let cancelled = false;
+    // Regenerated per open so the code always encodes the scenario on screen.
+    QRCode.toDataURL(shareReportUrl, { width: 320, margin: 1 })
+      .then((url) => {
+        if (!cancelled) setShareQrDataUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setShareQrDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isExportOpen, shareReportUrl]);
+
   const handleExport = async () => {
     try {
       setIsExporting(true);
@@ -939,7 +979,7 @@ export default function Dashboard() {
         </motion.section>
         <div className="workspace-actions">
           <span className="sync-status"><Signal className={isUpdating ? "animate-pulse" : ""} />{isUpdating ? "Updating your result" : `Updated ${lastUpdate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}</span>
-          <Button variant="outline" className="rounded-full" onClick={handleExport} disabled={isExporting}><Download />{isExporting ? "Preparing…" : "Export"}</Button>
+          <Button variant="outline" className="rounded-full" onClick={() => setIsExportOpen(true)}><Download />Export</Button>
           <AccountButton />
         </div>
       </header>
@@ -1083,6 +1123,40 @@ export default function Dashboard() {
           </motion.section>
         </AnimatePresence>
       </main>
+
+      <Dialog open={isExportOpen} onOpenChange={setIsExportOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Export this scenario</DialogTitle>
+            <DialogDescription>
+              {businessSubcategory} in {municipalityName} · {radius[0]} km reach
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-3 py-2">
+            {shareQrDataUrl ? (
+              <img
+                src={shareQrDataUrl}
+                alt={`QR code opening the ${businessSubcategory} in ${municipalityName} report`}
+                className="h-44 w-44 rounded-xl border border-border bg-white p-2"
+              />
+            ) : (
+              <div className="flex h-44 w-44 items-center justify-center rounded-xl border border-border text-xs text-muted-foreground">
+                Preparing code…
+              </div>
+            )}
+            <p className="text-center text-sm text-muted-foreground">
+              Scan with a phone camera to open this report. No sign-in needed.
+            </p>
+            <p className="w-full break-all text-center text-[10px] text-muted-foreground/70">{shareReportUrl}</p>
+          </div>
+          <DialogFooter className="sm:justify-center">
+            <Button onClick={handleExport} disabled={isExporting}>
+              <Download />
+              {isExporting ? "Preparing…" : "Download PDF"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="assistant-dock">
         <AnimatePresence>{isChatOpen && <motion.div initial={{ opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }} className="assistant-panel"><div className="assistant-panel-header"><div><span className="assistant-avatar"><BrainCircuit /></span><div><strong>BestSpot assistant</strong><p>Answers from this location</p></div></div><button type="button" onClick={() => setIsChatOpen(false)} aria-label="Close assistant"><X /></button></div><div className="assistant-panel-body"><ScenarioAIChat municipalityName={municipalityName} businessSubcategory={businessSubcategory} radiusKm={radius[0]} /></div></motion.div>}</AnimatePresence>

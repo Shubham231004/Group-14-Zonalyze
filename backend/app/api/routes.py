@@ -2,7 +2,7 @@ import logging
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.core.auth import require_user
 from sqlalchemy.orm import Session
@@ -84,6 +84,44 @@ def root():
     return {
         "message": "Zonalyze backend is running"
     }
+
+
+@public_router.get("/public/report")
+def public_feasibility_report_route(
+    municipality_name: str = Query(..., min_length=1, max_length=120),
+    business_subcategory: str = Query(..., min_length=1, max_length=120),
+    radius_km: float = Query(5, ge=1, le=25),
+    db: Session = Depends(get_db),
+):
+    """The scenario report, openable without a session — this is what the Export
+    dialog's QR code points at.
+
+    A phone scanning the QR arrives with no Clerk session, so the authed
+    /reports/feasibility route would simply 401. Public is acceptable *here* and
+    only here: a report contains market analysis derived from public census and
+    OpenStreetMap data. No account, user, or scenario-history data is reachable
+    through it, and the two identifying parameters are the same municipality and
+    business-subcategory values the public catalog endpoints already list.
+
+    Served inline rather than as an attachment so it renders in the phone browser
+    instead of dropping a file the reader then has to hunt for.
+
+    ponytail: bounded by the global per-IP limiter (RATE_LIMIT, on in prod at
+    240/minute). Give this route its own tighter bucket if the egress bill ever
+    shows it being farmed — it runs the full pipeline plus PDF generation.
+    """
+    request = AnalyzeScenarioRequest(
+        municipality_name=municipality_name,
+        business_subcategory=business_subcategory,
+        radius_km=radius_km,
+    )
+    dashboard = analyze_scenario(request=request, db=db)
+    filename, pdf = build_feasibility_report(dashboard)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @public_router.get("/health")
